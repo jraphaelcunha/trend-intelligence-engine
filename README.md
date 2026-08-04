@@ -1,15 +1,17 @@
 # 🏆 Trend Intelligence Engine
 
+> **[ 🇧🇷 Ler em Português ](README.pt-br.md)**
+
 [![n8n v2.20.12](https://img.shields.io/badge/n8n-2.20.12-orange.svg)](https://n8n.io)
 [![Gemini 2.5 Flash](https://img.shields.io/badge/Gemini-2.5%20Flash-blue.svg)](https://deepmind.google/technologies/gemini/)
 
-O **Trend Intelligence Engine** é um orquestrador híbrido sênior de inteligência competitiva e análise de sentimento semântica. Ele opera sob o conceito de **"Dark Kitchen" de Software**: todo o processamento de dados pesado, scraping e enriquecimento cognitivo via Inteligência Artificial acontecem de forma isolada em Python no *backstage*, enquanto a interface operacional é simplificada em painéis corporativos no **Monday.com**, orquestrados via **n8n v2**.
+The **Trend Intelligence Engine** is a senior hybrid competitive intelligence and semantic sentiment analysis orchestrator. Operating on a **Software "Dark Kitchen"** architecture, heavy data processing, scraping, and AI cognitive enrichment run in isolation in Python in the background, while the operational user interface is streamlined into enterprise dashboards in **Monday.com**, orchestrated via **n8n v2**.
 
 ---
 
-## 🏗️ 1. Arquitetura do Sistema ("The Dark Kitchen")
+## 🏗️ 1. System Architecture ("The Dark Kitchen")
 
-A esteira de dados opera de forma síncrona, robusta e modular, separando a inteligência da infraestrutura:
+The data pipeline runs synchronously, robustly, and modularly, separating intelligence from infrastructure:
 
 ```mermaid
 graph TD
@@ -18,76 +20,76 @@ graph TD
     C --> D[3. AI Video Analyzer]
     D --> E[4. Fetch Pending Analyses]
     E --> F[5. Parse JSON]
-    F --> G[5. Loop de Videos]
+    F --> G[5. Video Loop]
     G --> H[6. Create Monday Item]
     H --> I[6b. Create Monday Update]
     I --> J[7. Mark DB Exported]
     J --> G
 ```
 
-### 📡 Camadas do Pipeline
-* **Ingestão (YouTube API v3):** Scripts em Python filtram criadores independentes de médio e grande porte, avaliando taxas consistentes de engajamento no YouTube em lote.
-* **Corpus Semântico (Comments Extraction):** Captação automatizada e estruturada dos 100 comentários mais populares (relevantes) de cada novo vídeo encontrado.
-* **Cérebro Cognitivo (Gemini 2.5 Flash + pgvector):** Ingestão do corpus dos comentários + transcrição literal das legendas do vídeo. A IA sintetiza o contraste crítico: **A Tese do Criador (Narrativa)** vs. **A Reação Real do Público (Atrito/Adesão)**, gerando embeddings de 768 dimensões persistidos no Supabase.
-* **Despachante de UI (n8n GraphQL):** O n8n consome a fila do banco em lotes dinâmicos de 25 registros (paginação de segurança contra estouro de buffers de Node.js) e realiza chamadas GraphQL estritas ao Monday.com, criando os itens e anexando balões de fala HTML ricos com a análise comparativa de IA.
+### 📡 Pipeline Layers
+* **Ingestion (YouTube API v3):** Python scripts filter mid-to-large independent creators, evaluating consistent engagement rates across video batches.
+* **Semantic Corpus (Comments Extraction):** Automated and structured extraction of the top 100 most relevant comments for each newly discovered video.
+* **Cognitive Engine (Gemini 2.5 Flash + pgvector):** Ingests comment corpus + literal video transcriptions. The AI synthesizes critical contrast: **Creator's Thesis (Narrative)** vs. **Audience's Real Reaction (Friction/Adoption)**, generating 768-dimensional embeddings persisted in Supabase.
+* **UI Dispatcher (n8n GraphQL):** n8n polls the database queue in dynamic batches of 25 records (safety pagination preventing Node.js buffer overflows) and issues strict GraphQL requests to Monday.com, creating items and attaching rich HTML speech bubbles with AI comparative analysis.
 
 ---
 
-## ⚽ 2. Case de Sucesso Piloto: Copa do Mundo 2026
+## ⚽ 2. Pilot Success Case: 2026 FIFA World Cup
 
-Para demonstrar o poder do framework de forma real, configuramos o caso de uso piloto focado nas tendências do ecossistema da **Copa do Mundo FIFA 2026**:
+To demonstrate framework capabilities in a production scenario, a pilot use case was configured focusing on **2026 FIFA World Cup** ecosystem trends:
 
-* **Volume Processado:** **163 vídeos de alto impacto** estruturados e vetorizados.
-* **Modularidade Dinâmica:** O motor analisa os sub-temas definidos (*Figurinhas Panini*, *Análise Tática*, *Drama da Convocação*, *Polêmicas de Custos*, *Influencers*) e cria os grupos correspondentes de forma transparente e dinâmica diretamente no board do Monday.com.
-* **Estabilidade Corporativa:** **0% de falhas cognitivas**, com a paginação limitando o stdout a seguros ~325KB (resolvendo o clássico gargalo `stdout maxBuffer length exceeded` de 1MB do Node.js).
-* **Parâmetros do Piloto:** Todo o mapeamento de keywords e ângulos de análise está isolado e documentado em `src/pilots/world_cup_2026/config.yaml`.
+* **Processed Volume:** **163 high-impact videos** structured and vectorized.
+* **Dynamic Modularity:** The engine analyzes sub-topics (*Panini Stickers*, *Tactical Analysis*, *Call-up Drama*, *Cost Controversies*, *Influencer Reactions*) and creates matching groups dynamically directly inside the Monday.com board.
+* **Enterprise Stability:** **0% cognitive failures**, with pagination restricting stdout to a safe ~325KB (resolving Node.js's classic `stdout maxBuffer length exceeded` 1MB bottleneck).
+* **Pilot Parameters:** All keyword mappings and analytical parameters are isolated in `src/pilots/world_cup_2026/config.yaml`.
 
 ---
 
-## 🚀 3. Como Executar o Projeto Localmente
+## 🚀 3. How to Run Locally
 
-### Pré-requisitos
+### Prerequisites
 * Docker & Docker Compose
-* Chaves de API configuradas (YouTube, Gemini, Monday.com, Supabase)
+* Configured API Keys (YouTube, Gemini, Monday.com, Supabase)
 
-### Configuração de Variáveis de Ambiente
-1. Copie o arquivo de exemplo:
+### Environment Variable Setup
+1. Copy the example configuration file:
    ```bash
    cp .env.example .env
    ```
-2. Abra o arquivo `.env` e insira suas credenciais reais.
+2. Open `.env` and fill in your API credentials.
 
-### Subindo os Serviços com Docker
-Para inicializar o motor e o orquestrador n8n localmente, execute na pasta raiz:
+### Starting Services with Docker
+To launch the engine and n8n orchestrator locally, run from the root directory:
 ```bash
 docker compose -f docker/docker-compose.yml up --build -d
 ```
-O console do n8n estará acessível em [http://localhost:5678](http://localhost:5678).
+The n8n web console will be accessible at [http://localhost:5678](http://localhost:5678).
 
 ---
 
-## 📂 4. Estrutura Canônica do Repositório
+## 📂 4. Canonical Repository Structure
 
 ```text
-├── .github/workflows/          # CI/CD no Cloud Run
-├── docker/                     # Dockerfile multi-estágio e Compose
-├── n8n/                        # Backup do fluxo do orquestrador
-├── src/                        # Código-fonte Python
-│   ├── collector.py            # Coleta na API do YouTube
-│   ├── scraper.py              # Extração de comentários
-│   ├── analyzer.py             # Processamento Gemini & embeddings
-│   ├── fetcher.py              # Paginação síncrona do banco
+├── .github/workflows/          # CI/CD on Cloud Run
+├── docker/                     # Multi-stage Dockerfile & Compose
+├── n8n/                        # Orchestrator workflow export
+├── src/                        # Python source code
+│   ├── collector.py            # YouTube API collection
+│   ├── scraper.py              # Comment extraction
+│   ├── analyzer.py             # Gemini processing & embeddings
+│   ├── fetcher.py              # Synchronous DB pagination
 │   ├── utils/
-│   │   └── db.py               # Módulo relacional do Supabase
+│   │   └── db.py               # Supabase relational module
 │   └── pilots/
-│       └── world_cup_2026/     # Configuração e Runner do piloto
-├── requirements.txt            # Dependências Python
+│       └── world_cup_2026/     # Pilot runner & configuration
+├── requirements.txt            # Python dependencies
 └── README.md
 ```
 
 ---
 
-## 🗺️ 5. Próximos Passos (Roadmap)
-- [ ] **RAG de Insights:** Adicionar busca semântica em linguagem natural diretamente na planilha do Monday.com integrada à nossa base vetorial do Supabase.
-- [ ] **Multitenancy Config:** Permitir que múltiplos boards do Monday se conectem à mesma instância do Cloud Run, chaveando via tokens nas requisições do n8n.
-- [ ] **Telegram Agent Integration:** Um agente conversacional para enviar reportes de insights matinais para tomadores de decisão em tempo real.
+## 🗺️ 5. Roadmap
+- [ ] **Insights RAG:** Implement natural language semantic search directly on Monday.com boards connected to Supabase vector storage.
+- [ ] **Multitenancy Configuration:** Allow multiple Monday.com boards to connect to the same Cloud Run instance, routing via tokens in n8n requests.
+- [ ] **Telegram Agent Integration:** Conversational agent sending morning insight reports to decision-makers in real time.
