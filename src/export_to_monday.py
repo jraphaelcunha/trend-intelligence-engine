@@ -15,17 +15,16 @@ MONDAY_API_TOKEN = os.getenv('MONDAY_API_TOKEN')
 MONDAY_BOARD_ID = 18413482266
 MONDAY_URL = "https://api.monday.com/v2"
 
-# Importa helpers do fetch_pending_analyses
+# Import helpers from fetcher
 sys.path.append(os.path.dirname(__file__))
-from fetch_pending_analyses import (
+from src.fetcher import (
     get_existing_monday_groups,
     create_monday_group,
     format_pain_points_and_sentiment,
     map_sentiment,
     extract_section,
-    clean_string,
     SUBTOPIC_GROUP_MAP,
-    DEFAULT_GROUP_TITLE
+    DEFAULT_GROUP_TITLE,
 )
 
 def get_monday_headers():

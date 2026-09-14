@@ -1,3 +1,11 @@
-
-.env
+﻿.env
 venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+.DS_Store
+execution_*.json
