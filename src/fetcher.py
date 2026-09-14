@@ -1,16 +1,18 @@
+import json
 import os
 import sys
-import json
-import yaml
-import requests
+from datetime import date, datetime
 from decimal import Decimal
-from datetime import datetime, date
+
+import requests
+import yaml
 from dotenv import load_dotenv
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.utils.db import get_connection
 from psycopg2.extras import RealDictCursor
+
+from src.utils.db import get_connection
 
 sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
@@ -218,7 +220,7 @@ def fetch_pending():
                     return float(obj)
                 elif isinstance(obj, (datetime, date)):
                     return obj.isoformat()
-                return super(CustomEncoder, self).default(obj)
+                return super().default(obj)
 
         formatted_records = []
         for r in records:
@@ -324,7 +326,7 @@ def fetch_pending():
         print(json.dumps(formatted_records, cls=CustomEncoder, ensure_ascii=False))
 
     except Exception as e:
-        print(json.dumps({"error": f"Falha na conexão ou busca: {str(e)}"}))
+        print(json.dumps({"error": f"Falha na conexão ou busca: {e!s}"}))
         sys.exit(1)
     finally:
         if 'cur' in locals(): cur.close()

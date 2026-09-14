@@ -1,10 +1,11 @@
+import json
 import os
 import sys
-import json
-import yaml
+
 import google.generativeai as genai
-from youtube_transcript_api import YouTubeTranscriptApi
+import yaml
 from dotenv import load_dotenv
+from youtube_transcript_api import YouTubeTranscriptApi
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -199,7 +200,7 @@ def save_analysis(post_id, analysis_json, existing_analysis_id=None):
                 embedding_vector
             )
             cursor.execute(query, values)
-            print(f"  ✅ Novo Dossiê e Vetores salvos no banco!")
+            print("  ✅ Novo Dossiê e Vetores salvos no banco!")
             
     except Exception as e:
         print(f"  ❌ Erro ao salvar análise ou embedding: {e}")
@@ -268,12 +269,9 @@ def analyze_post(post, comments, active_config):
         response = model.generate_content(prompt)
         raw_text = response.text.strip()
         
-        if raw_text.startswith('```json'):
-            raw_text = raw_text[7:]
-        if raw_text.startswith('```'):
-            raw_text = raw_text[3:]
-        if raw_text.endswith('```'):
-            raw_text = raw_text[:-3]
+        raw_text = raw_text.removeprefix('```json')
+        raw_text = raw_text.removeprefix('```')
+        raw_text = raw_text.removesuffix('```')
             
         analysis_result = json.loads(raw_text.strip())
         
@@ -295,7 +293,7 @@ def run_analysis(config_path=None):
     active_model_name = active_config.get('analysis', {}).get('model', 'gemini-2.5-flash')
     
     print(f"{'='*60}")
-    print(f"🧠 MÓDULO DE IA ESTRATÉGICA - ANALYZER")
+    print("🧠 MÓDULO DE IA ESTRATÉGICA - ANALYZER")
     print(f"🤖 Modelo: {active_model_name}")
     print(f"{'='*60}\n")
     

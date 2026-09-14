@@ -1,10 +1,11 @@
+import json
 import os
 import sys
-import json
-import requests
+
 import psycopg2
-from psycopg2.extras import RealDictCursor
+import requests
 from dotenv import load_dotenv
+from psycopg2.extras import RealDictCursor
 
 # Reconfigura o terminal para UTF-8 no Windows
 sys.stdout.reconfigure(encoding='utf-8')
@@ -18,14 +19,15 @@ MONDAY_URL = "https://api.monday.com/v2"
 # Import helpers from fetcher
 sys.path.append(os.path.dirname(__file__))
 from src.fetcher import (
-    get_existing_monday_groups,
-    create_monday_group,
-    format_pain_points_and_sentiment,
-    map_sentiment,
-    extract_section,
-    SUBTOPIC_GROUP_MAP,
     DEFAULT_GROUP_TITLE,
+    SUBTOPIC_GROUP_MAP,
+    create_monday_group,
+    extract_section,
+    format_pain_points_and_sentiment,
+    get_existing_monday_groups,
+    map_sentiment,
 )
+
 
 def get_monday_headers():
     return {
@@ -251,7 +253,7 @@ def run_export():
             # 5. Marcar como exportado no Supabase
             cur.execute("UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE WHERE id = %s", (analysis_id,))
             conn.commit()
-            print(f"  ✓ Sucesso! Post marcado como exportado no Supabase.\n")
+            print("  ✓ Sucesso! Post marcado como exportado no Supabase.\n")
             success_count += 1
 
         print("="*60)

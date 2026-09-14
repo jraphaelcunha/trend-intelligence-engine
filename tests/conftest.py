@@ -2,9 +2,9 @@
 Pytest fixtures and deterministic test configurations for Trend Intelligence Engine.
 """
 
+
 import pytest
-from unittest.mock import MagicMock
-from src.models.schemas import VideoMetadata, CommentPayload, SentimentAnalysisResult
+from src.models.schemas import CommentPayload, SentimentAnalysisResult, VideoMetadata
 
 
 @pytest.fixture

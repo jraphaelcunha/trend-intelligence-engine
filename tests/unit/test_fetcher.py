@@ -2,14 +2,14 @@
 Unit tests for fetcher and Monday.com transformation helpers.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from src.fetcher import (
-    map_sentiment,
-    format_pain_points_and_sentiment,
-    extract_section,
     clean_string,
-    get_existing_monday_groups
+    extract_section,
+    format_pain_points_and_sentiment,
+    get_existing_monday_groups,
+    map_sentiment,
 )
 
 

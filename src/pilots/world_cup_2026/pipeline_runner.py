@@ -4,9 +4,9 @@ import sys
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
+from src.analyzer import run_analysis
 from src.collector import run_collection
 from src.scraper import run_comment_scraper
-from src.analyzer import run_analysis
 
 if __name__ == "__main__":
     pilot_dir = os.path.dirname(os.path.abspath(__file__))

@@ -1,14 +1,16 @@
+import datetime
 import os
 import sys
 import time
-import datetime
+
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.utils.db import get_connection
 from psycopg2.extras import execute_values
+
+from src.utils.db import get_connection
 
 sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()

@@ -2,7 +2,6 @@
 Unit tests for analyzer module and video extraction logic.
 """
 
-import pytest
 from src.analyzer import extract_video_id, get_subtopic_context
 
 

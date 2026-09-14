@@ -1,10 +1,11 @@
 import os
 import sys
+import time
+
 import psycopg2
-from psycopg2.extras import RealDictCursor
 import requests
 from dotenv import load_dotenv
-import time
+from psycopg2.extras import RealDictCursor
 
 sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
@@ -54,8 +55,8 @@ def export_to_n8n():
 
         print(f"Encontradas {len(records)} análises pendentes. Disparando para o n8n...")
 
+        from datetime import date, datetime
         from decimal import Decimal
-        from datetime import datetime, date
 
         exported_ids = []
         for record in records:
@@ -72,7 +73,7 @@ def export_to_n8n():
             
             # O n8n costuma retornar status 200, 201 ou "workflow started"
             if response.status_code in [200, 201]:
-                print(f"✓ Sucesso no envio para o n8n!")
+                print("✓ Sucesso no envio para o n8n!")
                 exported_ids.append(record['analysis_id'])
             else:
                 print(f"✗ Erro ao enviar para o n8n: {record['content_title'][:30]}: Código {response.status_code} - {response.text}")

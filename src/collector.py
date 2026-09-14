@@ -1,14 +1,16 @@
+import datetime
 import os
 import sys
+
 import yaml
-import datetime
-from googleapiclient.discovery import build
 from dotenv import load_dotenv
+from googleapiclient.discovery import build
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.utils.db import get_connection
 from psycopg2.extras import execute_values
+
+from src.utils.db import get_connection
 
 sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
@@ -205,7 +207,7 @@ def run_collection(config_path=None):
     subtopics = config['subtopics']
     
     print(f"{'='*60}")
-    print(f"🏆 TREND INTELLIGENCE ENGINE — COLLECTOR")
+    print("🏆 TREND INTELLIGENCE ENGINE — COLLECTOR")
     print(f"📌 Tema: {theme}")
     print(f"📅 Buscando desde: {search_cfg['date_start']}")
     print(f"📊 Top {search_cfg['max_videos_per_subtopic']} por sub-tema")
@@ -246,7 +248,7 @@ def run_collection(config_path=None):
             print(f"  📊 {len(unique_videos)} únicos encontrados, {saved} processados no banco.")
     
     print(f"\n{'='*60}")
-    print(f"✅ COLETA FINALIZADA!")
+    print("✅ COLETA FINALIZADA!")
     print(f"📊 Total de vídeos processados: {total_videos}")
     print(f"{'='*60}")
 

@@ -1,12 +1,19 @@
+import logging
 import os
 import sys
-import logging
 import traceback
-import psycopg2
+
 import google.generativeai as genai
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import psycopg2
 from dotenv import load_dotenv
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 # --- Setup ---
 sys.stdout.reconfigure(encoding='utf-8')
