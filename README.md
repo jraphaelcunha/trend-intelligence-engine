@@ -1,4 +1,4 @@
-﻿# 🏆 Trend Intelligence Engine — High-Throughput Semantic Listening & Social RAG
+# 🏆 Trend Intelligence Engine — High-Throughput Semantic Listening & Social RAG
 
 [![CI Quality Gate](https://github.com/jraphaelbarbosa/trend-intelligence-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/jraphaelbarbosa/trend-intelligence-engine)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)
@@ -12,6 +12,15 @@
 > **[ 🇧🇷 Ler em Português ](README.pt-br.md)**
 
 > **Executive Overview:** The **Trend Intelligence Engine** is an enterprise-grade social listening, competitive intelligence, and semantic sentiment analysis platform. Operating on a **Software "Dark Kitchen"** architecture, heavy data processing, scraping, and AI cognitive enrichment run in isolation in Python in the background, while the operational user interface is streamlined into enterprise Work OS dashboards (**Monday.com**) and messaging channels (**Telegram**), orchestrated via **n8n v2**.
+
+---
+
+## 🎯 Commercial Value & Strategic Radar: Detecting Market Shifts Before Viralization
+
+* **The Problem:** Marketing leaders and product strategists constantly react late to cultural and consumer sentiment shifts. Manually reading thousands of comments across hundreds of videos is impossible, while traditional keyword scrapers miss nuanced sentiment, community slang, and underlying product friction.
+* **Narrative vs. Reality Contrast:** The engine contrasts the **Creator's Thesis (the video's marketing pitch)** against the **Audience's Real Reaction (friction, unaddressed questions, spontaneous demand)**. Using **Gemini 2.5 Flash** and **Supabase pgvector (768-dim embeddings)**, it isolates actionable business signals from background noise.
+* **High-Volume Memory Resilience:** In high-volume operations (validated across **163 videos and 150,000+ comments** in the 2026 World Cup pilot), the pipeline resolved Node.js's 1MB buffer ceiling by implementing deterministic cursor streaming (~325KB per batch), ensuring 100% stability on Google Cloud Run.
+* **Executive Impact:** Feeds Monday.com boards with automated HTML briefings and pushes high-priority Telegram alerts, giving decision-makers a multi-week head start on emerging trends and competitor vulnerabilities.
 
 ---
 

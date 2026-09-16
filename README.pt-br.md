@@ -9,6 +9,15 @@ O **Trend Intelligence Engine** é um orquestrador híbrido sênior de inteligê
 
 ---
 
+## 🎯 Valor Comercial & Radar Estratégico: Detectando Tendências Antes da Viralização
+
+* **A Dor Real do Mercado:** Líderes de marketing e estrategistas de produto reagem tarde a mudanças culturais e de consumo. Ler manualmente milhares de comentários em centenas de vídeos é inviável, e scrapers tradicionais por palavras-chave não capturam sarcasmo, gírias da comunidade ou atritos reais com produtos.
+* **Contraste Narrativa vs. Realidade:** O motor contrasta a **Tese do Criador (a proposta comercial do vídeo)** com a **Reação Real do Público (objeções, dúvidas e desejos espontâneos nos comentários)**. Utilizando **Gemini 2.5 Flash** e **Supabase pgvector (embeddings de 768 dimensões)**, transforma ruído social em inteligência estratégica pura.
+* **Resiliência de Memória em Escala:** Em execuções pesadas (validado no piloto da Copa do Mundo 2026 com **163 vídeos e mais de 150.000 comentários**), eliminou os travamentos clássicos de estouro de memória do Node.js (`stdout maxBuffer length exceeded 1MB`) através de paginação dinâmica por cursor (~325KB por lote), garantindo 100% de estabilidade no Google Cloud Run.
+* **Impacto Executivo:** Alimenta quadros interativos no Monday.com com dossiês analíticos completos em HTML e dispara alertas prioritários no Telegram para tomada rápida de decisão.
+
+---
+
 ## 🏗️ 1. Arquitetura do Sistema ("The Dark Kitchen")
 
 A esteira de dados opera de forma síncrona, robusta e modular, separando a inteligência da infraestrutura:
