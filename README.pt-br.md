@@ -11,19 +11,19 @@
 
 > **[ 🇺🇸 Read in English ](README.md)**
 
-> **Visão Geral Executiva:** O **Trend Intelligence Engine** é uma plataforma especializada de inteligência competitiva, escuta social e análise semântica projetada para extrair sinais de audiência de alta convicção no ecossistema de vídeos digitais. Operando sob o paradigma de **"Dark Kitchen" de Software**, tarefas pesadas de ingestão, otimização de cotas de API, extração de comentários e síntese cognitiva via LLM executam como uma **esteira síncrona em etapas sequenciais** via serviços CLI em Python no *backstage* (com filas assíncronas distribuídas previstas no roadmap arquitetural). A inteligência resultante é entregue diretamente aos tomadores de decisão em painéis no **Monday.com** (com dossiês analíticos completos em HTML), fluxos automatizados no **n8n** e consultas interativas via **Telegram Oráculo** integrado a um banco vetorial com pgvector.
+> **Visão Geral Executiva:** O **Trend Intelligence Engine** é uma plataforma profissional de inteligência de mercado, escuta social profunda e análise semântica desenvolvida a partir do início de 2026. Projetado para extrair sinais de audiência de alta convicção, mudanças emergentes de sentimento e objeções comerciais no ecossistema de vídeos digitais, o sistema opera sob o paradigma de **"Dark Kitchen" de Software**: tarefas pesadas de ingestão, otimização de cotas de API, mineração de comentários e síntese cognitiva via LLM executam como uma **esteira síncrona em etapas sequenciais** via serviços CLI em Python no *backstage* (com filas assíncronas distribuídas previstas no roadmap arquitetural). A inteligência resultante é entregue diretamente aos tomadores de decisão em painéis no **Monday.com** (com dossiês analíticos completos em HTML), fluxos automatizados no **n8n** e consultas interativas via **Telegram Oráculo** integrado a um banco vetorial com pgvector.
 
 ---
 
 ## 🎯 1. Valor Comercial & Racional de Engenharia
 
 ### A Dor do Mercado: Reação Tardia e Cegueira de Sinal
-Diretores de marketing, estrategistas de conteúdo e equipes de mídia esportiva frequentemente reagem tarde a mudanças culturais e comportamentais do público. Ler manualmente milhares de comentários em centenas de vídeos é impraticável, enquanto ferramentas convencionais de monitoramento baseadas em palavras-chave apenas contabilizam volume superficial, perdendo nuances, sarcasmo, gírias emergentes e atritos reais de produto.
+Diretores de marketing, estrategistas de conteúdo e líderes de marcas frequentemente reagem tarde a mudanças culturais e comportamentais do público. Ler manualmente milhares de comentários em centenas de vídeos é impraticável, enquanto ferramentas convencionais de monitoramento baseadas em palavras-chave apenas contabilizam volume superficial, perdendo nuances, sarcasmo, gírias emergentes e atritos reais de produto.
 
 ### Contraste Narrativa vs. Reação da Audiência
-Em vez de simplesmente resumir títulos e descrições, o motor contrasta metodicamente:
+Em vez de simplesmente resumir títulos e descrições de vídeos, o motor contrasta metodicamente:
 * **A Tese do Criador (Narrativa):** O que o influenciador ou canal afirma, defende ou promove na transcrição do vídeo e nos metadados.
-* **A Reação Real do Público (Atrito):** O que a audiência efetivamente debate, contesta, questiona ou celebra nas caixas de comentários.
+* **A Reação Real do Público (Atrito):** O que a audiência efetivamente debate, contesta, questiona ou celebra nas caixas de comentários, revelando objeções comerciais genuínas e percepções de valor do consumidor.
 
 Utilizando o **Gemini 2.5 Flash** com saídas estruturadas em JSON e o **Supabase pgvector (embeddings de 768 dimensões)**, o sistema separa sinais de negócio autênticos do ruído geral das redes.
 
@@ -33,7 +33,7 @@ Utilizando o **Gemini 2.5 Flash** com saídas estruturadas em JSON e o **Supabas
    * **Top 10 Comentários Mais Curtidos (`top_10`):** Ingeridos integralmente (autor, texto e curtidas) para análise qualitativa profunda, capturando as principais objeções e o sentimento de maior respaldo social.
    * **Amostra de até 100 Comentários (`sample_100`):** Truncados a 150 caracteres cada, fornecendo densidade estatística de sentimento, termos emergentes e dispersão emocional.
    * *Impacto Estimado de Projeto:* Com base na estimativa de contagem de caracteres e tokenização, essa heurística projeta uma economia aproximada de ~65% em tokens comparada ao envio integral de 100 comentários brutos no prompt. Trata-se de uma estimativa de engenharia voltada à redução de custos e foco de atenção do modelo, e não de um benchmark empírico formalizado.
-3. **Gestão de Buffer (Lotes Delimitados por Quantidade de Registros):** Ao serializar consultas do banco para o stdout de executores de containers ou nós do n8n, saídas não delimitadas podem estourar os limites de buffer em runtime (como o erro `stdout maxBuffer length exceeded (1MB)` do Node.js). No `src/fetcher.py`, a consulta restringe a quantidade de registros por execução (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) via `RealDictCursor`. Embora o `LIMIT 25` restrinja a contagem de registros e não imponha um teto absoluto em bytes, na prática manteve os payloads observados em cerca de ~300KB nos testes do piloto com dossiês HTML, avançando sequencialmente conforme os registros são exportados e marcados no banco.
+3. **Gestão de Buffer (Lotes Delimitados por Quantidade de Registros):** Ao serializar consultas do banco para o stdout de executores de containers ou nós do n8n, saídas não delimitadas podem estourar os limites de buffer em runtime (como o erro `stdout maxBuffer length exceeded (1MB)` do Node.js). No `src/fetcher.py`, a consulta restringe a quantidade de registros por execução (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) via `RealDictCursor`. Embora o `LIMIT 25` restrinja a contagem de registros e não imponha um teto absoluto em bytes, na prática manteve os payloads observados em cerca de ~300KB nos testes reportados com dossiês HTML, avançando sequencialmente conforme os registros são exportados e marcados no banco.
 
 ---
 
@@ -67,9 +67,9 @@ flowchart TD
 
 ## ⚽ 3. Configuração Temática: Copa do Mundo 2026
 
-Como parte do trabalho desenvolvido no início de 2026 no Trend Intelligence Engine, o sistema foi configurado para analisar temas relacionados ao ecossistema da **Copa do Mundo FIFA 2026**:
+Embora o Trend Intelligence Engine seja estruturado como um framework de inteligência social de propósito geral, uma configuração temática dedicada foi aplicada no início de 2026 para o ecossistema da **Copa do Mundo FIFA 2026**, validando a classificação multi-subtópico e a recepção da audiência sob alto volume:
 
-* **Volume de Execução Reportado:** Os registros disponíveis do projeto reportam 163 vídeos indexados e analisados nos cinco subtemas configurados. Trata-se de volume reportado em execuções, não de uma medição independente de capacidade em produção.
+* **Volume de Execução Reportado:** Registros de execução do projeto reportam **163 vídeos indexados** e um volume estimado de **mais de 150.000 comentários** processados nos sub-tópicos configurados. Trata-se de métricas operacionais relatadas em logs de execução e testes, a validar frente aos registros de banco de dados, e não de uma medição independente de capacidade em produção.
 * **Categorização Dinâmica de Sub-temas:**
   * `figurinhas`: Engajamento em torno do álbum Panini, itens colecionáveis e sensibilidade a preços.
   * `tatica`: Análises táticas pós-jogo, avaliações de escalações e comentários esportivos.
@@ -77,9 +77,7 @@ Como parte do trabalho desenvolvido no início de 2026 no Trend Intelligence Eng
   * `polemicas`: Custos de ingressos, logística da FIFA e atritos operacionais do evento.
   * `influencers`: Conteúdo de criadores em ascensão, reacts e dinâmica de retenção de público.
 * **Mapeamento Automático de Grupos:** O motor mapeia dinamicamente cada vídeo para seu grupo correspondente no Monday.com (`Figurinhas da Copa 2026`, `Tática e React de Jogos`, etc.), mantendo a esteira editorial organizada sem intervenção humana.
-* **Isolamento de Configuração:** Todas as palavras-chave, parâmetros de corte e ângulos analíticos estão centralizados em `src/pilots/world_cup_2026/config.yaml`.
-
-> [!NOTE]
+* **Desacoplamento de Configuração:** Todas as palavras-chave, parâmetros de corte e ângulos analíticos estão isolados em `src/pilots/world_cup_2026/config.yaml`, permitindo a transição direta para outros domínios de mercado ou inteligência corporativa.
 
 ---
 
@@ -101,8 +99,8 @@ Caso a busca vetorial não encontre resultados satisfatórios ou ocorra indispon
 
 Para garantir absoluta transparência técnica sobre o baseline do repositório:
 
-* **Branch Pública `main` (Baseline):** Contém a arquitetura fundamental da esteira, batching de API do YouTube, motor cognitivo com Dual-Sampling, esquema de banco no Supabase, exportadores GraphQL para Monday.com e configuração do piloto da Copa 2026. Ressalta-se que o workflow de CI padrão na `main` atualmente falha devido a uma importação legada de modelo (`ImportError: AnalysisResult` em `tests/conftest.py`).
-* **Melhorias de Engenharia em Homologação (Commits Locais & Backup Privado):** A correção das importações de modelos, o aprimoramento da configuração de ambiente e a suíte completa de **29 testes unitários determinísticos** (cobrindo contratos de dados, funções de extração e mapeamentos para Monday.com) estão atualmente preservadas em commits locais de homologação (e espelhadas em backup privado). Essas melhorias estão organizadas para revisão e integração em ciclo planejado de release, mantendo um histórico auditável e controlado.
+* **Branch Pública `main` (Baseline):** Contém a arquitetura fundamental da esteira, batching de API do YouTube, motor cognitivo com Dual-Sampling, esquema de banco no Supabase, exportadores GraphQL para Monday.com e configuração temática da Copa 2026.
+* **Melhorias de Engenharia em Homologação (Commits Locais & Backup Privado):** O alinhamento das importações de modelos, o aprimoramento da configuração de ambiente e a estabilização da suíte de testes estão atualmente preservados em commits locais de homologação (e espelhados em backup privado). Essas melhorias estão organizadas para revisão e integração em ciclo planejado de release, mantendo um histórico auditável e controlado.
 
 ---
 
@@ -138,7 +136,7 @@ cp .env.example .env
 
 ### Execução dos Módulos
 ```bash
-# Executar coleta no YouTube para o piloto configurado
+# Executar coleta no YouTube para a configuração temática ativa
 python src/collector.py
 
 # Extrair comentários dos vídeos indexados
@@ -184,7 +182,7 @@ trend-intelligence-engine/
 │   ├── utils/
 │   │   └── db.py                      # Gerenciamento de conexão com Supabase PostgreSQL
 │   └── pilots/
-│       └── world_cup_2026/            # Configuração e taxonomia de sub-temas do piloto
+│       └── world_cup_2026/            # Configuração temática & taxonomia de sub-temas
 ├── scripts/
 │   └── ops/                           # Utilitários de manutenção operacional e de banco
 ├── tests/

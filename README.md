@@ -11,21 +11,21 @@
 
 > **[ 🇧🇷 Ler em Português ](README.pt-br.md)**
 
-> **Executive Overview:** The **Trend Intelligence Engine** is a specialized social listening, media intelligence, and semantic analysis platform designed to extract high-conviction audience signals from digital video ecosystems. Operating on a **Software "Dark Kitchen"** architecture, heavy data ingestion, quota-optimized API batching, comment scraping, and LLM-driven cognitive synthesis run as a **synchronous, staged execution pipeline** in Python CLI services in the backstage (with asynchronous distributed queues planned on the architectural roadmap). Enriched intelligence is then delivered directly to decision-makers via enterprise Work OS boards (**Monday.com** with rich HTML update dossiers), workflow automations (**n8n** webhooks), and interactive conversational search (**Telegram Oráculo** with pgvector RAG).
+> **Executive Overview:** The **Trend Intelligence Engine** is a professional social listening, market intelligence, and semantic analysis platform developed starting in early 2026. Designed to extract high-conviction audience signals, emerging sentiment shifts, and commercial objections from digital video ecosystems, the system operates on a **Software "Dark Kitchen"** architecture: heavy data ingestion, quota-optimized API batching, comment mining, and LLM-driven cognitive synthesis run as a **synchronous, staged execution pipeline** in Python CLI services in the backstage (with asynchronous distributed queues on the architectural roadmap). Enriched intelligence is delivered directly to decision-makers via enterprise Work OS boards (**Monday.com** with rich HTML update dossiers), workflow automations (**n8n** webhooks), and interactive conversational search (**Telegram Oráculo** with pgvector RAG).
 
 ---
 
 ## 🎯 1. Commercial Value & Engineering Rationale
 
 ### The Problem: Late Reaction and Signal Blindness
-Marketing directors, content strategists, and sports media teams frequently react late to cultural shifts and audience sentiment changes. Manually reading thousands of comments across hundreds of videos is impossible, while traditional keyword scrapers only count surface volumes, missing sarcasm, emergent community slang, and qualitative product friction.
+Marketing directors, content strategists, and brand leaders frequently react late to cultural shifts and audience sentiment changes. Manually reading thousands of comments across hundreds of videos is impossible, while traditional keyword scrapers only count surface volumes, missing sarcasm, emergent community slang, and qualitative product friction.
 
 ### Narrative vs. Audience Reaction Contrast
-Rather than merely summarizing video descriptions, the engine systematically contrasts:
-* **The Creator's Thesis (The Narrative):** What the creator claims, defends, or sells in the video transcription and metadata.
-* **The Audience's Real Reaction (The Friction):** What viewers actively debate, reject, question, or celebrate across the comment threads.
+Rather than merely summarizing video titles or descriptions, the engine systematically contrasts:
+* **The Creator's Thesis (The Narrative):** What the creator claims, defends, or promotes in the video transcription and metadata.
+* **The Audience's Real Reaction (The Friction):** What viewers actively debate, reject, question, or celebrate across comment threads, exposing authentic market objections and consumer sentiment.
 
-Using **Gemini 2.5 Flash** with structured JSON output and **Supabase pgvector (768-dimensional embeddings)**, the engine separates authentic business signals from background noise.
+Using **Gemini 2.5 Flash** with structured JSON output and **Supabase pgvector (768-dimensional embeddings)**, the engine isolates actionable business signals from background noise.
 
 ### Key Architectural Decisions
 1. **YouTube API Quota Batching:** The YouTube Data API v3 enforces a default daily quota limit of 10,000 units. A standard search request (`youtube.search().list`) consumes 100 units. Requesting statistics individually for each returned video would consume 1 unit per call and quickly exhaust quotas. The engine gathers candidate video IDs first, then performs **batched statistics requests** via `youtube.videos().list(id=','.join(video_ids), part='statistics')` (up to 50 video IDs per single API call consuming only 1 unit), enabling high-coverage discovery within strict API constraints.
@@ -33,7 +33,7 @@ Using **Gemini 2.5 Flash** with structured JSON output and **Supabase pgvector (
    * **Top 10 Most-Liked Comments (`top_10`):** Ingested in full (author, text, likes) to capture high-conviction qualitative critique, major counterarguments, and top community sentiment.
    * **Sample of Up to 100 Comments (`sample_100`):** Truncated to 150 characters each to provide broad sentiment density, keyword emergence, and emotional tone.
    * *Estimated Design Impact:* Based on prompt length and tokenization estimates, this heuristic targets approximately ~65% token savings compared to passing 100 full raw comments into the prompt context. This is an architectural design estimate aimed at cost reduction and attention focus rather than a formal empirical benchmark across arbitrary corpora.
-3. **Buffer Management (Bounded Record Batching):** When serializing database queries to stdout for container runners or n8n nodes, unbounded query outputs risk triggering runtime buffer exceptions (such as Node.js's `stdout maxBuffer length exceeded (1MB)`). In `src/fetcher.py`, the query limits results by record count (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) using `RealDictCursor`. While `LIMIT 25` bounds the quantity of records rather than imposing an absolute byte ceiling, in practice with typical metadata and HTML update dossiers it kept observed payload sizes around ~300KB in pilot tests, advancing sequentially as records are exported and marked in the database.
+3. **Buffer Management (Bounded Record Batching):** When serializing database queries to stdout for container runners or n8n nodes, unbounded query outputs risk triggering runtime buffer exceptions (such as Node.js's `stdout maxBuffer length exceeded (1MB)`). In `src/fetcher.py`, the query limits results by record count (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) using `RealDictCursor`. While `LIMIT 25` bounds the quantity of records rather than imposing an absolute byte ceiling, in practice with typical metadata and HTML update dossiers it kept observed payload sizes around ~300KB in reported test runs, advancing sequentially as records are exported and marked in the database.
 
 ---
 
@@ -65,11 +65,11 @@ flowchart TD
 
 ---
 
-## ⚽ 3. Topic Configuration: 2026 FIFA World Cup
+## ⚽ 3. Domain Configuration: 2026 FIFA World Cup
 
-As part of the Trend Intelligence Engine work developed in early 2026, the system was configured to analyze topics related to the **2026 FIFA World Cup** ecosystem:
+While the Trend Intelligence Engine is architected as a general-purpose social listening framework, a dedicated domain configuration was deployed in early 2026 focusing on the **2026 FIFA World Cup** ecosystem to evaluate multi-subtopic classification and high-volume audience reception:
 
-* **Reported Execution Volume:** Available project records report 163 indexed and analyzed video entries across five configured subtopics. This is a reported execution figure, not a claim of independently audited production throughput.
+* **Reported Execution Volume:** Project execution logs report **163 indexed videos** and an estimated volume of **over 150,000 comments** processed across the configured subtopics. These figures represent reported operational metrics from project runs and testing logs, to be validated against database execution records, rather than independently certified production benchmarks.
 * **Dynamic Subtopic Categorization:**
   * `figurinhas`: Panini sticker album hype, collectible trading trends, and pricing sentiment.
   * `tatica`: Tactical analysis, post-match reviews, and formation debates.
@@ -77,9 +77,7 @@ As part of the Trend Intelligence Engine work developed in early 2026, the syste
   * `polemicas`: Ticketing costs, FIFA organizational logistics, and fan travel concerns.
   * `influencers`: Rising creators, react formats, and creator economy engagement.
 * **Automated Group Mapping:** The engine dynamically resolves subtopics to designated Monday.com groups (`Figurinhas da Copa 2026`, `Tática e React de Jogos`, etc.), keeping content editorial boards structured without manual triaging.
-* **Configuration Isolation:** All search queries, minimum engagement thresholds, and analysis angles are decoupled into `src/pilots/world_cup_2026/config.yaml`.
-
-> [!NOTE]
+* **Decoupled Configuration:** All search queries, minimum engagement thresholds, and analysis angles are isolated in `src/pilots/world_cup_2026/config.yaml`, allowing seamless swapping to other corporate or market intelligence domains.
 
 ---
 
@@ -101,8 +99,8 @@ If vector matching returns empty results or encounters connection timeouts, the 
 
 To maintain absolute technical transparency regarding the repository baseline:
 
-* **Public `main` Branch (Baseline):** Contains the foundational pipeline architecture, YouTube quota batching, Dual-Sampling cognitive engine, Supabase database schema, Monday.com GraphQL integration, and the 2026 World Cup pilot configuration. Note that the default GitHub Actions CI workflow on `main` currently fails on a pre-existing legacy model import (`ImportError: AnalysisResult` in `tests/conftest.py`).
-* **Staged Engineering Improvements (Local & Private Backup):** The corrected model imports, environment configuration hardening, and the expanded deterministic test suite (**29 unit tests** covering data contracts, heuristic parsers, and Monday export mappers) are currently maintained in local staging commits (and mirrored in private backup). These updates are queued for review and integration in an upcoming release cycle, preserving a disciplined verification history.
+* **Public `main` Branch (Baseline):** Contains the foundational pipeline architecture, YouTube quota batching, Dual-Sampling cognitive engine, Supabase database schema, Monday.com GraphQL integration, and the 2026 World Cup domain configuration.
+* **Staged Engineering Improvements (Local & Private Backup):** Model import alignment, environment configuration hardening, and test suite stabilization are currently maintained in local staging commits (and mirrored in private backup). These updates are queued for review and integration in an upcoming release cycle, preserving a disciplined verification history.
 
 ---
 
@@ -138,7 +136,7 @@ cp .env.example .env
 
 ### Running the Pipeline Components
 ```bash
-# Run YouTube collector for active pilot
+# Run YouTube collector for active domain configuration
 python src/collector.py
 
 # Extract comments for indexed videos
@@ -184,7 +182,7 @@ trend-intelligence-engine/
 │   ├── utils/
 │   │   └── db.py                      # Supabase PostgreSQL connection pooling
 │   └── pilots/
-│       └── world_cup_2026/            # Pilot configuration & subtopic taxonomy
+│       └── world_cup_2026/            # Domain configuration & subtopic taxonomy
 ├── scripts/
 │   └── ops/                           # Operational and database maintenance utilities
 ├── tests/
