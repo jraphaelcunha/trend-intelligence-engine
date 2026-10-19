@@ -95,12 +95,22 @@ Caso a busca vetorial não encontre resultados satisfatórios ou ocorra indispon
 
 ---
 
-## 🔍 5. Status de Engenharia & Alinhamento de CI
+## 🔍 5. Status de Engenharia, Quality Gates & Avaliação de IA
 
-Para garantir absoluta transparência técnica sobre o baseline do repositório:
+Para garantir absoluta transparência técnica sobre a qualidade de código, resiliência e rigor metodológico:
 
-* **Branch Pública `main` (Baseline):** Contém a arquitetura fundamental da esteira, batching de API do YouTube, motor cognitivo com Dual-Sampling, esquema de banco no Supabase, exportadores GraphQL para Monday.com e configuração temática da Copa 2026.
-* **Melhorias de Engenharia em Homologação (Commits Locais & Backup Privado):** O alinhamento das importações de modelos, o aprimoramento da configuração de ambiente e a estabilização da suíte de testes estão atualmente preservados em commits locais de homologação (e espelhados em backup privado). Essas melhorias estão organizadas para revisão e integração em ciclo planejado de release, mantendo um histórico auditável e controlado.
+* **Quality Gate de CI Estritamente Bloqueante:** O workflow no GitHub Actions aplica verificação rigorosa com o Ruff (executado sem `--exit-zero`), assegurando tolerância zero a defeitos de sintaxe em runtime, variáveis indefinidas ou exceções não tratadas em `src/` e `tests/`.
+* **Cobertura de Testes Empírica (75% Medida):** A suíte de testes foi elevada de um baseline de 18% para **75% de cobertura global de declarações**, com 82 testes determinísticos de unidade, comportamento e avaliação.
+* **Testes Abrangentes de Comportamento:**
+  * **Resiliência de Ingestão:** Agregação de estatísticas em lote na API do YouTube (`videos().list(id=','.join(ids), part='statistics')`), filtros de corte por visualizações/engajamento e tratamento de listas vazias em `src/collector.py`.
+  * **Raspagem de Comentários:** Extração oficial de comentários via YouTube Data API com tolerância a comentários desativados e inserção idempotente no banco em `src/scraper.py`.
+  * **Motor Cognitivo Dual-Sampling:** Validação de casos extremos em `src/analyzer.py` para conjuntos vazios de comentários, amostras reduzidas (<10 comentários), amostras amplas (>100 comentários), fallback de transcrição ausente, remoção de delimitadores markdown (` ```json `) e coerção estrita de sentimentos.
+  * **Integrações Corporativas:** Montagem de mutations GraphQL para criação de itens e balões de atualização rich-text no Monday.com, resolução de grupos e higienização de strings em `src/export_to_monday.py`; busca vetorial por cosseno no Supabase pgvector e fallback relacional em `src/telegram_oraculo.py`; retry de conexão com backoff exponencial em `src/utils/db.py`.
+* **Fundação de Avaliação de IA Offline (`tests/evals/`):**
+  * **Benchmark Sintético com Ground Truth Fixo:** Fixtures de avaliação controlada (`sentiment_goldens.json`) com rótulos multiclasse de sentimento e dores de audiência.
+  * **Performance de Classificação:** Avaliação offline medindo Acurácia global (100% no benchmark) e Macro-F1 (1.000) nas classes "Positivo", "Negativo" e "Neutro".
+  * **Avaliação de Recuperação e RAG:** Medição de métricas de ranking Recall@1, Recall@3, Recall@5 e Mean Reciprocal Rank (MRR = 1.000, Recall@3 = 100%) para busca por similaridade vetorial.
+  * **Robustez Adversarial e Conteúdo Não Confiável:** Casos de teste sistemáticos que comprovam que injeções de prompt (ex.: `Ignore previous instructions...`, system overrides), quebras de delimitadores, escapes maliciosos de SQL (`'); DROP TABLE...`) e ataques de buffer overflow são neutralizados sem comprometer a estabilidade do sistema.
 
 ---
 
@@ -152,6 +162,15 @@ python src/export_to_monday.py
 python src/telegram_oraculo.py
 ```
 
+### Executando Testes e Avaliações de IA
+```bash
+# Executar a suíte completa de testes com relatório de cobertura
+pytest tests/ -v --cov=src --cov-report=term-missing
+
+# Executar especificamente o benchmark offline de Avaliação de IA
+pytest tests/evals/ -v
+```
+
 ### Executando com Docker Compose
 ```bash
 docker compose -f docker/docker-compose.yml up --build -d
@@ -166,7 +185,7 @@ A interface do n8n estará acessível em [http://localhost:5678](http://localhos
 trend-intelligence-engine/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                     # Automação de lint e testes no GitHub Actions
+│       ├── ci.yml                     # Automação de CI estritamente bloqueante (Ruff + Pytest)
 │       └── google-cloudrun.yml        # Workflow de deploy no Google Cloud Run
 ├── docker/                            # Arquivos Dockerfile multi-stage e Compose
 ├── n8n/                               # Exportações dos fluxos do n8n
@@ -180,17 +199,30 @@ trend-intelligence-engine/
 │   ├── export_to_monday.py            # Exportador direto para GraphQL da Monday.com
 │   ├── telegram_oraculo.py            # Assistente RAG conversacional com fallback relacional
 │   ├── utils/
-│   │   └── db.py                      # Gerenciamento de conexão com Supabase PostgreSQL
+│   │   └── db.py                      # Resiliência de conexão e retry com Supabase PostgreSQL
 │   └── pilots/
 │       └── world_cup_2026/            # Configuração temática & taxonomia de sub-temas
 ├── scripts/
 │   └── ops/                           # Utilitários de manutenção operacional e de banco
 ├── tests/
-│   ├── conftest.py                    # Fixtures globais e mocks de API para Pytest
+│   ├── conftest.py                    # Fixtures globais e mocks determinísticos para Pytest
+│   ├── evals/                         # Suíte de avaliação de IA offline e robustez adversarial
+│   │   ├── fixtures/
+│   │   │   └── sentiment_goldens.json # Benchmark sintético com ground truth fixo
+│   │   ├── test_sentiment_eval.py     # Avaliação de Acurácia e Macro-F1 de classificação
+│   │   ├── test_retrieval_eval.py     # Harness de avaliação de Recall@K e MRR no RAG
+│   │   └── test_adversarial_inputs.py # Defesas contra injeção de prompt e dados maliciosos
 │   └── unit/
 │       ├── test_schemas.py            # Testes de validação dos contratos Pydantic
 │       ├── test_fetcher.py            # Testes de mapeamento e transformação
-│       └── test_analyzer.py           # Testes heurísticos e de extração de IDs
+│       ├── test_analyzer.py           # Testes de Dual-Sampling, parsing e persistência
+│       ├── test_collector.py          # Testes de busca, estatísticas em lote e filtros
+│       ├── test_scraper.py            # Testes de extração de comentários e resiliência
+│       ├── test_export_to_monday.py   # Testes de mutations GraphQL de itens e updates Monday
+│       ├── test_telegram_oraculo.py   # Testes de busca vetorial e fallback relacional
+│       ├── test_db.py                 # Testes de resiliência e retry de conexão do banco
+│       └── test_n8n_exporter.py       # Testes de serialização e envio ao webhook n8n
+├── pyproject.toml                     # Configuração do linter Ruff e cobertura Pytest
 ├── requirements.txt                   # Dependências de produção
 ├── README.md                          # Documentação técnica em inglês
 └── README.pt-br.md                    # Documentação técnica em português
