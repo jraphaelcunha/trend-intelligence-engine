@@ -1,153 +1,217 @@
-# 🏆 Trend Intelligence Engine — High-Throughput Semantic Listening & Social RAG
+# 🏆 Trend Intelligence Engine — Semantic Listening & Social RAG
 
-[![CI Quality Gate](https://github.com/jraphaelbarbosa/trend-intelligence-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/jraphaelbarbosa/trend-intelligence-engine)
-![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)
-![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2-red)
-![Tests](https://img.shields.io/badge/Tests-20%20passed-brightgreen)
-![Orchestration](https://img.shields.io/badge/Orchestrator-n8n%20v2-orange.svg)
-![LLM](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-magenta.svg)
-![Database](https://img.shields.io/badge/Database-Supabase%20pgvector-green.svg)
-![Deploy](https://img.shields.io/badge/Deploy-Google%20Cloud%20Run-blue.svg)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
+[![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2-red)](https://docs.pydantic.dev/)
+[![LLM](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-magenta.svg)](https://deepmind.google/technologies/gemini/)
+[![Embeddings](https://img.shields.io/badge/Embeddings-Gemini%20768d-8A2BE2)](https://ai.google.dev/)
+[![Database](https://img.shields.io/badge/Database-Supabase%20pgvector-green.svg)](https://supabase.com/)
+[![Work OS](https://img.shields.io/badge/Work%20OS-Monday.com%20GraphQL-00CA72)](https://monday.com/)
+[![Orchestrator](https://img.shields.io/badge/Orchestrator-n8n-orange.svg)](https://n8n.io/)
+[![Alerts](https://img.shields.io/badge/Bot-Telegram%20Oráculo-2CA5E0?logo=telegram)](https://telegram.org/)
 
 > **[ 🇧🇷 Ler em Português ](README.pt-br.md)**
 
-> **Executive Overview:** The **Trend Intelligence Engine** is an enterprise-grade social listening, competitive intelligence, and semantic sentiment analysis platform. Operating on a **Software "Dark Kitchen"** architecture, heavy data processing, scraping, and AI cognitive enrichment run in isolation in Python in the background, while the operational user interface is streamlined into enterprise Work OS dashboards (**Monday.com**) and messaging channels (**Telegram**), orchestrated via **n8n v2**.
+> **Executive Overview:** The **Trend Intelligence Engine** is a specialized social listening, media intelligence, and semantic analysis platform designed to extract high-conviction audience signals from digital video ecosystems. Operating on a **Software "Dark Kitchen"** architecture, heavy data ingestion, quota-optimized API batching, comment scraping, and LLM-driven cognitive synthesis run as a **synchronous, staged execution pipeline** in Python CLI services in the backstage (with asynchronous distributed queues planned on the architectural roadmap). Enriched intelligence is then delivered directly to decision-makers via enterprise Work OS boards (**Monday.com** with rich HTML update dossiers), workflow automations (**n8n** webhooks), and interactive conversational search (**Telegram Oráculo** with pgvector RAG).
 
 ---
 
-## 🎯 Commercial Value & Strategic Radar: Detecting Market Shifts Before Viralization
+## 🎯 1. Commercial Value & Engineering Rationale
 
-* **The Problem:** Marketing leaders and product strategists constantly react late to cultural and consumer sentiment shifts. Manually reading thousands of comments across hundreds of videos is impossible, while traditional keyword scrapers miss nuanced sentiment, community slang, and underlying product friction.
-* **Narrative vs. Reality Contrast:** The engine contrasts the **Creator's Thesis (the video's marketing pitch)** against the **Audience's Real Reaction (friction, unaddressed questions, spontaneous demand)**. Using **Gemini 2.5 Flash** and **Supabase pgvector (768-dim embeddings)**, it isolates actionable business signals from background noise.
-* **High-Volume Memory Resilience:** In high-volume operations (validated across **163 videos and 150,000+ comments** in the 2026 World Cup pilot), the pipeline resolved Node.js's 1MB buffer ceiling by implementing deterministic cursor streaming (~325KB per batch), ensuring 100% stability on Google Cloud Run.
-* **Executive Impact:** Feeds Monday.com boards with automated HTML briefings and pushes high-priority Telegram alerts, giving decision-makers a multi-week head start on emerging trends and competitor vulnerabilities.
+### The Problem: Late Reaction and Signal Blindness
+Marketing directors, content strategists, and sports media teams frequently react late to cultural shifts and audience sentiment changes. Manually reading thousands of comments across hundreds of videos is impossible, while traditional keyword scrapers only count surface volumes, missing sarcasm, emergent community slang, and qualitative product friction.
+
+### Narrative vs. Audience Reaction Contrast
+Rather than merely summarizing video descriptions, the engine systematically contrasts:
+* **The Creator's Thesis (The Narrative):** What the creator claims, defends, or sells in the video transcription and metadata.
+* **The Audience's Real Reaction (The Friction):** What viewers actively debate, reject, question, or celebrate across the comment threads.
+
+Using **Gemini 2.5 Flash** with structured JSON output and **Supabase pgvector (768-dimensional embeddings)**, the engine separates authentic business signals from background noise.
+
+### Key Architectural Decisions
+1. **YouTube API Quota Batching:** The YouTube Data API v3 enforces a default daily quota limit of 10,000 units. A standard search request (`youtube.search().list`) consumes 100 units. Requesting statistics individually for each returned video would consume 1 unit per call and quickly exhaust quotas. The engine gathers candidate video IDs first, then performs **batched statistics requests** via `youtube.videos().list(id=','.join(video_ids), part='statistics')` (up to 50 video IDs per single API call consuming only 1 unit), enabling high-coverage discovery within strict API constraints.
+2. **Dual-Sampling Comment Heuristic:** Passing hundreds of complete comments into an LLM context window causes unnecessary token inflation, latency, and context dispersion. The engine implements a deterministic **Dual-Sampling** strategy:
+   * **Top 10 Most-Liked Comments (`top_10`):** Ingested in full (author, text, likes) to capture high-conviction qualitative critique, major counterarguments, and top community sentiment.
+   * **Sample of Up to 100 Comments (`sample_100`):** Truncated to 150 characters each to provide broad sentiment density, keyword emergence, and emotional tone.
+   * *Estimated Design Impact:* Based on prompt length and tokenization estimates, this heuristic targets approximately ~65% token savings compared to passing 100 full raw comments into the prompt context. This is an architectural design estimate aimed at cost reduction and attention focus rather than a formal empirical benchmark across arbitrary corpora.
+3. **Buffer Management (Bounded Record Batching):** When serializing database queries to stdout for container runners or n8n nodes, unbounded query outputs risk triggering runtime buffer exceptions (such as Node.js's `stdout maxBuffer length exceeded (1MB)`). In `src/fetcher.py`, the query limits results by record count (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) using `RealDictCursor`. While `LIMIT 25` bounds the quantity of records rather than imposing an absolute byte ceiling, in practice with typical metadata and HTML update dossiers it kept observed payload sizes around ~300KB in pilot tests, advancing sequentially as records are exported and marked in the database.
 
 ---
 
-## 🏗️ 1. System Architecture ("The Dark Kitchen")
+## 🏗️ 2. System Architecture ("The Dark Kitchen")
 
-The data pipeline runs synchronously, robustly, and modularly, separating intelligence from infrastructure:
+The pipeline separates data intelligence from operational presentation:
 
 ```mermaid
 flowchart TD
-    A[Cron Trigger 02:00 AM] --> B[1. YouTube API Collector]
-    B --> C[2. High-Volume Comment Scraper]
-    C --> D[3. AI Video & Sentiment Analyzer - Gemini 2.5 Flash]
-    D -->|Persist Embeddings + Metadata| E[(Supabase PostgreSQL + pgvector)]
-    E --> F[4. Safe Dynamic Paginator - 25 records/batch]
-    F --> G[5. n8n Orchestrator Queue]
-    G --> H[6. Monday.com Work OS Board Items & Updates]
-    G --> I[7. Telegram Decision-Maker Alerts]
+    Cron["Cron Trigger / Manual Dispatch"] --> Collector["1. YouTube Collector\n(Search + Batched stats up to 50 IDs)"]
+    Collector --> Scraper["2. Comment Scraper\n(Relevance-sorted threads)"]
+    Scraper --> Analyzer["3. AI Cognitive Engine\n(Dual-Sampling + Gemini 2.5 Flash)"]
+    Analyzer --> Supabase[("4. Supabase PostgreSQL\n(pgvector 768d + match_post_analysis RPC)")]
+    Supabase --> Fetcher["5. Batch Fetcher\n(Bounded LIMIT 25 on unexported records)"]
+    Fetcher --> Distribution{"Distribution Channels"}
+    Distribution --> Monday["Monday.com Work OS\n(GraphQL items + HTML update dossiers)"]
+    Distribution --> N8N["n8n Webhook Dispatcher\n(Automated workflow orchestration)"]
+    Supabase <--> Telegram["Telegram Oráculo Bot\n(Vector similarity search + Relational fallback)"]
 ```
 
 ### 📡 Pipeline Layers
-* **Ingestion (YouTube API v3):** Filter mid-to-large creators and high-velocity discussions, evaluating consistent engagement rates across video batches.
-* **Semantic Corpus (Comments Extraction):** Automated extraction of high-relevance comments per video for deep sentiment mining.
-* **Cognitive Engine (Gemini 2.5 Flash + pgvector):** Ingests comment corpus + literal video transcriptions. The model contrasts **Creator's Thesis (Narrative)** vs. **Audience's Real Reaction (Friction/Adoption)**, generating 768-dimensional embeddings persisted in Supabase.
-* **UI Dispatcher (n8n GraphQL):** n8n polls the database queue in dynamic batches of 25 records (safety pagination preventing Node.js buffer overflows) and issues strict GraphQL requests to Monday.com, creating items and attaching rich HTML dossiers with AI comparative analysis.
+
+* **Ingestion Layer (`src/collector.py`):** Config-driven keyword and subtopic queries via YouTube API v3. Uses candidate ID collection followed by batched statistics requests (up to 50 IDs/call) and filters candidates by minimum view counts and engagement ratios over elapsed time.
+* **Comment Extraction (`src/scraper.py`):** Captures relevance-ordered comment threads via `youtube.commentThreads().list`, extracting author names, text, like counts, and publication timestamps with automatic deduplication in `post_comments`.
+* **Cognitive Engine (`src/analyzer.py`):** Combines video metadata, video transcription (via `youtube-transcript-api`), and the **Dual-Sampling comment corpus** (Top 10 full + up to 100 truncated). Generates structured JSON via Gemini 2.5 Flash and produces 768-dimensional vector embeddings using `models/gemini-embedding-2` persisted into Supabase PostgreSQL.
+* **Batch Fetcher & Payload Formatter (`src/fetcher.py`):** Queries unexported analyses in batches of up to 25 records (`WHERE exported_to_zapier = FALSE ORDER BY id ASC LIMIT 25`) using `RealDictCursor`. While this limits the record count rather than enforcing a strict byte cap, it substantially mitigates stdout buffer overflow risks in execution runners. It resolves Monday group IDs dynamically, maps sentiment tags, extracts narrative vs. reaction sections, and formats rich HTML briefing dossiers for export.
+* **Work OS Integration (`src/export_to_monday.py`):** Issues typed GraphQL mutations to Monday.com, creating items under dynamic subtopic groups and posting detailed HTML briefing dossiers directly into item update bubbles.
+* **Interactive Oráculo (`src/telegram_oraculo.py`):** Telegram bot allowing stakeholders to query indexed dossiers using natural language. Converts queries to 768d embeddings and executes PostgreSQL vector similarity search via `match_post_analysis(%s::vector, %s, %s)`, with automatic relational fallback to recent analyses if vector search yields no results.
 
 ---
 
-## 🛡️ 2. Enterprise Reliability & Design Decisions
+## ⚽ 3. Media Intelligence Pilot: 2026 FIFA World Cup
 
-### ⚡ Memory Buffer Overflow Mitigation
-* In high-throughput executions (150k+ processed comments), standard batch serialization frequently triggered Node.js's runtime failure `stdout maxBuffer length exceeded (1MB)`.
-* **Architectural Fix:** Implemented deterministic cursor-based pagination restricting each batch payload to ~325KB, guaranteeing zero memory overflow across Cloud Run container runners.
+To validate the framework in a realistic high-tempo sports media environment, a production pilot was configured around the **2026 FIFA World Cup** ecosystem:
 
-### 📐 Strict Data Contracts (Pydantic v2)
-* Upgraded data boundaries between scrapers, analyzers, and exporters to strict `BaseModel` classes (`VideoMetadata`, `CommentPayload`, `SentimentAnalysisResult`, `MondayItemPayload`).
-* Prevents data corruption and ensures schema evolution compatibility across n8n webhook nodes.
+* **Scope & Observed Pilot Volume:** In initial test runs reported during the pilot setup, 163 video entries were indexed and analyzed across the 5 configured subtopics, verifying that the schema, sentiment mapping, and Monday.com export functions handled multi-topic batches without manual intervention.
+* **Dynamic Subtopic Categorization:**
+  * `figurinhas`: Panini sticker album hype, collectible trading trends, and pricing sentiment.
+  * `tatica`: Tactical analysis, post-match reviews, and formation debates.
+  * `duvidas`: Squad speculation, national team call-up debates, and player form controversies.
+  * `polemicas`: Ticketing costs, FIFA organizational logistics, and fan travel concerns.
+  * `influencers`: Rising creators, react formats, and creator economy engagement.
+* **Automated Group Mapping:** The engine dynamically resolves subtopics to designated Monday.com groups (`Figurinhas da Copa 2026`, `Tática e React de Jogos`, etc.), keeping content editorial boards structured without manual triaging.
+* **Configuration Isolation:** All search queries, minimum engagement thresholds, and analysis angles are decoupled into `src/pilots/world_cup_2026/config.yaml`.
 
-### 🧪 Deterministic Pytest Test Suite
-* Complete automated test suite covering sentiment classification heuristics, data contract validation, section parsing, and Monday GraphQL API mocks.
-* Runs in **< 1.0 second** with zero API token consumption during CI.
-
----
-
-## ⚽ 3. Production Pilot: 2026 FIFA World Cup
-
-To demonstrate framework capabilities in a production scenario, a pilot use case was configured focusing on **2026 FIFA World Cup** ecosystem trends:
-
-* **Processed Volume:** **163 high-impact videos** and thousands of comments structured and vectorized.
-* **Dynamic Modularity:** The engine analyzes sub-topics (*Panini Stickers*, *Tactical Analysis*, *Call-up Drama*, *Cost Controversies*, *Influencer Reactions*) and creates matching groups dynamically directly inside the Monday.com board.
-* **Enterprise Stability:** **0% cognitive failures**, with pagination restricting stdout to a safe ~325KB.
-* **Pilot Parameters:** All keyword mappings and analytical parameters are isolated in `src/pilots/world_cup_2026/config.yaml`.
+> [!NOTE]
+> **Use Case Context:** This pilot was built as an independent engineering demonstration of sports media intelligence and audience sentiment analysis. It does not represent an official partnership, commercial contract, or endorsement by LiveMode, CazéTV, FIFA, or Panini.
 
 ---
 
-## 🚀 4. How to Run Locally
+## 🛡️ 4. Data Contracts & Architecture Resilience
+
+### Data Contracts & Schemas (Pydantic v2)
+Typed data schemas are formally declared using Pydantic v2 in `src/models/schemas.py` (`VideoMetadata`, `CommentPayload`, `SentimentAnalysisResult`, and `MondayItemPayload`), specifying the expected interface contracts between collection, analysis, and distribution layers. In the current runtime pipeline, intermediate data flows primarily as Python dictionaries, with full end-to-end runtime model validation actively being extended across all pipeline stages.
+
+### Defensive RAG with Relational Fallback
+In `src/telegram_oraculo.py`, queries against the knowledge base use cosine similarity over pgvector embeddings:
+```sql
+SELECT * FROM match_post_analysis(query_embedding::vector, match_threshold, match_count);
+```
+If vector matching returns empty results or encounters connection timeouts, the system gracefully degrades to a relational fallback, retrieving the 5 most recent complete dossiers ordered by analysis timestamp.
+
+---
+
+## 🔍 5. Engineering Status & CI Alignment
+
+To maintain absolute technical transparency regarding the repository baseline:
+
+* **Public `main` Branch (Baseline):** Contains the foundational pipeline architecture, YouTube quota batching, Dual-Sampling cognitive engine, Supabase database schema, Monday.com GraphQL integration, and the 2026 World Cup pilot configuration. Note that the default GitHub Actions CI workflow on `main` currently fails on a pre-existing legacy model import (`ImportError: AnalysisResult` in `tests/conftest.py`).
+* **Staged Engineering Improvements (Local & Private Backup):** The corrected model imports, environment configuration hardening, and the expanded deterministic test suite (**29 unit tests** covering data contracts, heuristic parsers, and Monday export mappers) are currently maintained in local staging commits (and mirrored in private backup). These updates are queued for review and integration in an upcoming release cycle, preserving a disciplined verification history.
+
+---
+
+## 🚀 6. Local Setup & Quickstart
 
 ### Prerequisites
 * Python 3.11+
-* Docker & Docker Compose
-* Configured API Keys (YouTube, Gemini, Monday.com, Supabase)
+* Docker & Docker Compose (optional, for local n8n instance)
+* API Credentials:
+  * YouTube Data API v3 (`YOUTUBE_API_KEY`)
+  * Google Gemini API (`GEMINI_API_KEY`)
+  * Supabase PostgreSQL connection string (`DATABASE_URL`)
+  * Monday.com API Token (`MONDAY_API_TOKEN`)
+  * Telegram Bot Token (`TELEGRAM_BOT_TOKEN`, optional for Oráculo)
 
-### Setup & Testing
+### Installation
 ```bash
 # 1. Clone repository
-git clone https://github.com/jraphaelbarbosa/trend-intelligence-engine.git
+git clone https://github.com/jraphaelcunha/trend-intelligence-engine.git
 cd trend-intelligence-engine
 
-# 2. Setup virtual environment
+# 2. Configure virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Run automated test suite
-pytest tests/ -v --cov=src
-
-# 5. Run linter
-ruff check src/ tests/
+# 4. Configure environment variables
+cp .env.example .env
+# Edit .env with your credentials
 ```
 
-### Running Services with Docker
+### Running the Pipeline Components
+```bash
+# Run YouTube collector for active pilot
+python src/collector.py
+
+# Extract comments for indexed videos
+python src/scraper.py
+
+# Run cognitive analysis with Gemini 2.5 Flash
+python src/analyzer.py
+
+# Export pending dossiers to Monday.com
+python src/export_to_monday.py
+
+# Start interactive Telegram Oráculo bot
+python src/telegram_oraculo.py
+```
+
+### Running with Docker Compose
 ```bash
 docker compose -f docker/docker-compose.yml up --build -d
 ```
-The n8n web console will be accessible at [http://localhost:5678](http://localhost:5678).
+The n8n orchestrator console will be available at [http://localhost:5678](http://localhost:5678).
 
 ---
 
-## 📂 5. Canonical Repository Structure
+## 📂 7. Repository Structure
 
 ```text
 trend-intelligence-engine/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                     # Automated Lint & Pytest Quality Gate
-│       └── google-cloudrun.yml        # Google Cloud Run Deployment
-├── docker/                            # Multi-stage Dockerfile & Compose
-├── n8n/                               # Orchestrator workflow export
+│       └── google-cloudrun.yml        # Google Cloud Run deployment workflow
+├── docker/                            # Multi-stage Dockerfile & Compose definitions
+├── n8n/                               # Exported n8n orchestration workflows
 ├── src/                               # Core Python source code
 │   ├── models/
-│   │   └── schemas.py                 # Pydantic v2 Strict Data Contracts
-│   ├── collector.py                   # YouTube API collection
-│   ├── scraper.py                     # Comment extraction pipeline
-│   ├── analyzer.py                    # Gemini cognitive processing & embeddings
-│   ├── fetcher.py                     # Synchronous DB pagination & Monday helpers
-│   ├── export_to_monday.py            # Direct Monday GraphQL exporter
-│   ├── telegram_oraculo.py            # Conversational alert agent
+│   │   └── schemas.py                 # Pydantic v2 data contracts
+│   ├── collector.py                   # YouTube API ingestion with batched stats
+│   ├── scraper.py                     # Comment extraction & deduplication
+│   ├── analyzer.py                    # Gemini 2.5 Flash cognitive engine & 768d embeddings
+│   ├── fetcher.py                     # Bounded 25-record batch fetcher & Monday payload formatter
+│   ├── export_to_monday.py            # Direct Monday.com GraphQL exporter
+│   ├── telegram_oraculo.py            # Conversational RAG assistant with relational fallback
 │   ├── utils/
-│   │   └── db.py                      # Supabase relational connection pooling
+│   │   └── db.py                      # Supabase PostgreSQL connection pooling
 │   └── pilots/
-│       └── world_cup_2026/            # Pilot runner & configuration
+│       └── world_cup_2026/            # Pilot configuration & subtopic taxonomy
 ├── scripts/
-│   └── ops/                           # Isolated database maintenance & operational utilities
+│   └── ops/                           # Operational and database maintenance utilities
 ├── tests/
-│   ├── conftest.py                    # Pytest global fixtures & API mocks
+│   ├── conftest.py                    # Pytest fixtures and API mocks
 │   └── unit/
-│       ├── test_schemas.py            # Pydantic data contract tests
-│       ├── test_fetcher.py            # Transformation & mapping tests
-│       └── test_analyzer.py           # Video ID extraction & context tests
+│       ├── test_schemas.py            # Pydantic contract validation tests
+│       ├── test_fetcher.py            # Transformation & mapping unit tests
+│       └── test_analyzer.py           # ID extraction & heuristic tests
 ├── requirements.txt                   # Production dependencies
-└── README.md                          # Technical documentation
+├── README.md                          # English technical documentation
+└── README.pt-br.md                    # Portuguese technical documentation
 ```
 
 ---
 
-## 🗺️ 6. Roadmap
-- [ ] **Insights RAG:** Implement natural language semantic search directly on Monday.com boards connected to Supabase vector storage.
-- [ ] **Multitenancy Configuration:** Allow multiple Monday.com boards to connect to the same Cloud Run instance, routing via tokens in n8n requests.
-- [ ] **Proactive Telegram Push:** Automated daily insight dispatch to stakeholders every morning.
+## 🗺️ 8. Roadmap
+
+- [ ] **Multi-Platform Ingestion:** Extend collection pipeline beyond YouTube to TikTok and Instagram Reels video transcripts.
+- [ ] **Multi-Tenant Board Routing:** Support dynamic routing across multiple Monday.com boards via webhook headers in n8n.
+- [ ] **Proactive Trend Alerts:** Scheduled push notifications in Telegram when a subtopic exhibits anomalous negative friction or sudden engagement spikes.
+- [ ] **Asynchronous Task Queue:** Transition sequential batch CLI scripts to asynchronous worker queues (e.g., Celery/Redis or asyncio task loops) for high-concurrency ingestion.
+
+---
+
+## 👤 Author
+
+**João Raphael Cunha**<br/>
+Solutions Architect & AI Engineer<br/>
+[GitHub Profile](https://github.com/jraphaelcunha) | [LinkedIn](https://www.linkedin.com/in/joaoraphaelcunha/)
