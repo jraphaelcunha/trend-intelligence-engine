@@ -8,6 +8,8 @@ from googleapiclient.discovery import build
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import psycopg2
+from googleapiclient.errors import HttpError
 from psycopg2.extras import execute_values
 
 from src.utils.db import get_connection
@@ -46,7 +48,7 @@ def get_videos_needing_comments():
         """
         cursor.execute(query)
         videos = cursor.fetchall()
-    except Exception as e:
+    except (psycopg2.Error, ValueError) as e:
         print(f"Erro ao buscar vídeos no banco: {e}")
     finally:
         if 'conn' in locals() and conn:
@@ -77,7 +79,7 @@ def fetch_comments_via_api(video_id, max_results=100):
                 "likes_count": int(snippet.get("likeCount", 0)),
                 "published_at": pub_at
             })
-    except Exception as e:
+    except (HttpError, Exception) as e:  # noqa: BLE001 - YouTube API can raise HttpError or network/parsing exceptions
         err_msg = str(e)
         if "commentsDisabled" in err_msg:
             print(f"  ⚠️ Comentários desativados para o vídeo ID {video_id}")
@@ -119,7 +121,7 @@ def save_comments_to_db(post_id, comments_data):
         
         execute_values(cursor, insert_query, values_to_insert)
         print(f"  ✅ Salvos {len(comments_data)} comentários para o vídeo no banco de dados!")
-    except Exception as e:
+    except (psycopg2.Error, ValueError) as e:
         print(f"  ❌ Erro ao salvar comentários no banco: {e}")
     finally:
         if 'conn' in locals() and conn:

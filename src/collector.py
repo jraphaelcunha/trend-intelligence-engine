@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import psycopg2
 from psycopg2.extras import execute_values
 
 from src.utils.db import get_connection
@@ -98,7 +99,7 @@ def search_youtube_videos(query, subtopic_id, config, max_results=10, order='vie
             days_elapsed = time_diff.total_seconds() / 86400.0
             if days_elapsed <= 0:
                 days_elapsed = 0.04  # Cerca de 1 hora mínimo para evitar divisão por zero
-        except Exception as te:
+        except (ValueError, KeyError, TypeError) as te:
             print(f"  ⚠️ Erro ao calcular data do vídeo {video_id}: {te}")
             days_elapsed = 1.0
 
@@ -192,7 +193,7 @@ def save_to_database(videos):
         print(f"  ✅ {len(videos)} vídeos processados no banco (inseridos/atualizados).")
         return len(videos)
 
-    except Exception as e:
+    except (psycopg2.Error, ValueError) as e:
         print(f"  ❌ Erro ao salvar no banco: {e}")
         return 0
     finally:

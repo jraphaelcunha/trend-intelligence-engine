@@ -23,7 +23,7 @@ def get_connection(retries=3, delay=2):
         except psycopg2.OperationalError as e:
             if attempt == retries:
                 print(f"❌ Erro crítico ao conectar ao Supabase na tentativa {attempt}/{retries}: {e}")
-                raise e
+                raise
             print(f"⚠️ Falha de conexão na tentativa {attempt}/{retries}. Tentando novamente em {delay}s...")
             time.sleep(delay)
 

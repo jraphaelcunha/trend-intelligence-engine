@@ -1,9 +1,10 @@
-﻿"""
+"""
 Pytest fixtures and deterministic test configurations for Trend Intelligence Engine.
 """
 
 
 import pytest
+
 from src.models.schemas import CommentPayload, SentimentAnalysisResult, VideoMetadata
 
 

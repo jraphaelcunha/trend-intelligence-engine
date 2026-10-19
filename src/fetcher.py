@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from src.utils.db import get_connection
@@ -85,7 +86,7 @@ def get_existing_monday_groups():
                 return {g["title"].strip().lower(): g["id"] for g in groups}
         else:
             print(f"Erro HTTP ao buscar grupos: {resp.status_code} - {resp.text}", file=sys.stderr)
-    except Exception as e:
+    except requests.RequestException as e:
         print(f"Exceção ao buscar grupos da Monday: {e}", file=sys.stderr)
     return {}
 
@@ -117,7 +118,7 @@ def create_monday_group(group_title):
             return group_id
         else:
             print(f"Erro HTTP ao criar grupo: {resp.status_code} - {resp.text}", file=sys.stderr)
-    except Exception as e:
+    except requests.RequestException as e:
         print(f"Exceção ao criar grupo na Monday: {e}", file=sys.stderr)
     return None
 
@@ -130,7 +131,7 @@ def extract_section(text, header, next_header=None):
             if next_header and next_header in parts:
                 parts = parts.split(next_header)[0]
             return parts.strip()
-    except Exception as e:
+    except (IndexError, ValueError) as e:
         print(f"Erro ao extrair seção '{header}': {e}", file=sys.stderr)
     return text.strip()
 
@@ -156,7 +157,7 @@ def format_pain_points_and_sentiment(pain_points, sentiment_str):
                 pain_points_text = ", ".join(pp_list) if pp_list else "Nenhuma dor detectada"
             else:
                 pain_points_text = pain_points
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             pain_points_text = pain_points if pain_points else "Nenhuma dor detectada"
     else:
         pain_points_text = "Nenhuma dor detectada"
@@ -325,12 +326,14 @@ def fetch_pending():
 
         print(json.dumps(formatted_records, cls=CustomEncoder, ensure_ascii=False))
 
-    except Exception as e:
+    except (psycopg2.Error, ValueError, KeyError) as e:
         print(json.dumps({"error": f"Falha na conexão ou busca: {e!s}"}))
         sys.exit(1)
     finally:
-        if 'cur' in locals(): cur.close()
-        if 'conn' in locals(): conn.close()
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
 
 if __name__ == "__main__":
     fetch_pending()

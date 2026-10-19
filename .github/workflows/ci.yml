@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Ruff Linter
         run: |
-          ruff check src/ tests/ --ignore E501,E402 --exit-zero
+          ruff check src/ tests/
 
       - name: Run Pytest Test Suite
         env:
