@@ -65,11 +65,11 @@ flowchart TD
 
 ---
 
-## ⚽ 3. Piloto de Inteligência de Conteúdo: Copa do Mundo 2026
+## ⚽ 3. Configuração Temática: Copa do Mundo 2026
 
-Como prova de conceito em um cenário de alto volume e relevância na mídia esportiva, o motor foi configurado para o ecossistema da **Copa do Mundo FIFA 2026**:
+Como parte do trabalho desenvolvido no início de 2026 no Trend Intelligence Engine, o sistema foi configurado para analisar temas relacionados ao ecossistema da **Copa do Mundo FIFA 2026**:
 
-* **Escopo e Volume Observado no Piloto:** Em execuções de teste reportadas durante a estruturação do piloto, 163 vídeos foram indexados e analisados ao longo dos 5 sub-tópicos configurados, demonstrando que os esquemas, o mapeamento de sentimento e os despachos para o Monday.com operam de ponta a ponta sem intervenção manual.
+* **Volume de Execução Reportado:** Os registros disponíveis do projeto reportam 163 vídeos indexados e analisados nos cinco subtemas configurados. Trata-se de volume reportado em execuções, não de uma medição independente de capacidade em produção.
 * **Categorização Dinâmica de Sub-temas:**
   * `figurinhas`: Engajamento em torno do álbum Panini, itens colecionáveis e sensibilidade a preços.
   * `tatica`: Análises táticas pós-jogo, avaliações de escalações e comentários esportivos.
@@ -80,7 +80,6 @@ Como prova de conceito em um cenário de alto volume e relevância na mídia esp
 * **Isolamento de Configuração:** Todas as palavras-chave, parâmetros de corte e ângulos analíticos estão centralizados em `src/pilots/world_cup_2026/config.yaml`.
 
 > [!NOTE]
-> **Contexto de Uso:** Este piloto foi construído como demonstração técnica independente de engenharia de software e inteligência de mídia. Não implica nem afirma qualquer vínculo comercial oficial, patrocínio ou contrato com LiveMode, CazéTV, FIFA ou Panini.
 
 ---
 
