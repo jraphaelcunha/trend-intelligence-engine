@@ -11,7 +11,7 @@
 
 > **[ 🇺🇸 Read in English ](README.md)**
 
-> **Visão Geral Executiva:** O **Trend Intelligence Engine** é uma plataforma especializada de inteligência competitiva, escuta social e análise semântica projetada para extrair sinais de audiência de alta convicção no ecossistema de vídeos digitais. Operando sob o paradigma de **"Dark Kitchen" de Software**, tarefas pesadas de ingestão, otimização de cotas de API, extração de comentários e síntese cognitiva via LLM executam assincronamente em Python no *backstage*. A inteligência resultante é entregue diretamente aos tomadores de decisão em painéis no **Monday.com** (com dossiês analíticos completos em HTML), fluxos automatizados no **n8n** e consultas interativas via **Telegram Oráculo** integrado a um banco vetorial com pgvector.
+> **Visão Geral Executiva:** O **Trend Intelligence Engine** é uma plataforma especializada de inteligência competitiva, escuta social e análise semântica projetada para extrair sinais de audiência de alta convicção no ecossistema de vídeos digitais. Operando sob o paradigma de **"Dark Kitchen" de Software**, tarefas pesadas de ingestão, otimização de cotas de API, extração de comentários e síntese cognitiva via LLM executam como uma **esteira síncrona em etapas sequenciais** via serviços CLI em Python no *backstage* (com filas assíncronas distribuídas previstas no roadmap arquitetural). A inteligência resultante é entregue diretamente aos tomadores de decisão em painéis no **Monday.com** (com dossiês analíticos completos em HTML), fluxos automatizados no **n8n** e consultas interativas via **Telegram Oráculo** integrado a um banco vetorial com pgvector.
 
 ---
 
@@ -32,8 +32,8 @@ Utilizando o **Gemini 2.5 Flash** com contratos estruturados em JSON e o **Supab
 2. **Heurística de Dual-Sampling de Comentários:** Injetar centenas de comentários brutos na janela de contexto de um LLM gera custo excessivo de tokens, aumento de latência e dispersão de atenção do modelo. O motor implementa uma estratégia determinística de **Dual-Sampling**:
    * **Top 10 Comentários Mais Curtidos (`top_10`):** Ingeridos integralmente (autor, texto e curtidas) para análise qualitativa profunda, capturando as principais objeções e o sentimento de maior respaldo social.
    * **Amostra de até 100 Comentários (`sample_100`):** Truncados a 150 caracteres cada, fornecendo densidade estatística de sentimento, termos emergentes e dispersão emocional.
-   * *Impacto:* Reduz o consumo de tokens na janela de contexto em mais de 65% em comparação ao envio bruto de comentários, preservando simultaneamente profundidade crítica e representatividade coletiva.
-3. **Proteção Contra Estouro de Memória (Paginador Dinâmico):** Ao serializar consultas volumosas para o stdout em runners de containers ou nós do n8n, saídas em JSON muito extensas ultrapassam o limite do Node.js (`stdout maxBuffer length exceeded (1MB)`). O motor adota paginação por cursor em lotes dinâmicos de 25 registros (~325KB por lote), garantindo execução segura em ambientes conteinerizados.
+   * *Impacto Estimado de Projeto:* Com base na estimativa de contagem de caracteres e tokenização, essa heurística projeta uma economia aproximada de ~65% em tokens comparada ao envio integral de 100 comentários brutos no prompt. Trata-se de uma estimativa de engenharia voltada à redução de custos e foco de atenção do modelo, e não de um benchmark empírico formalizado.
+3. **Proteção de Buffer de Memória (Filtragem em Lotes Fixos):** Ao serializar consultas do banco para o stdout de executores de containers ou nós do n8n, saídas JSON descontroladas podem facilmente ultrapassar limites de buffer (como o erro clássico do Node.js `stdout maxBuffer length exceeded (1MB)`). No `src/fetcher.py`, o sistema contorna isso executando uma consulta delimitada (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) utilizando `RealDictCursor`. O processamento de registros pendentes em lotes fixos de 25 itens mantém o volume de saída no stdout contido (observado em cerca de ~300KB nos testes do piloto com dossiês HTML), avançando sequencialmente conforme os itens são exportados e marcados no banco de dados.
 
 ---
 
@@ -47,7 +47,7 @@ flowchart TD
     Collector --> Scraper["2. Extrator de Comentários\n(Threads ordenadas por relevância)"]
     Scraper --> Analyzer["3. Motor Cognitivo de IA\n(Dual-Sampling + Gemini 2.5 Flash)"]
     Analyzer --> Supabase[("4. Supabase PostgreSQL\n(pgvector 768d + RPC match_post_analysis)")]
-    Supabase --> Fetcher["5. Paginador Dinâmico\n(25 registros/lote, ~325KB seguros)"]
+    Supabase --> Fetcher["5. Fetcher em Lotes\n(LIMIT 25 fixo em pendentes de exportação)"]
     Fetcher --> Distribution{"Canais de Distribuição"}
     Distribution --> Monday["Monday.com Work OS\n(Itens GraphQL + Dossiês HTML em updates)"]
     Distribution --> N8N["Despachante n8n\n(Orquestração e webhooks)"]
@@ -59,7 +59,7 @@ flowchart TD
 * **Camada de Ingestão (`src/collector.py`):** Consultas orientadas a arquivo de configuração via YouTube API v3. Filtra vídeos por engajamento e visualizações em relação ao tempo de publicação, utilizando buscas de IDs seguidas de chamadas em lote de estatísticas (até 50 vídeos por unidade de cota).
 * **Extração de Comentários (`src/scraper.py`):** Capta comentários ordenados por relevância via `youtube.commentThreads().list`, gravando autor, texto, contagem de curtidas e data de publicação com deduplicação no banco relacional.
 * **Motor Cognitivo (`src/analyzer.py`):** Combina metadados do vídeo, transcrição do áudio (via `youtube-transcript-api`) e o **corpus em Dual-Sampling** (10 completos + até 100 truncados). Gera saída estritamente estruturada em JSON com o Gemini 2.5 Flash e calcula embeddings vetoriais de 768 dimensões com `models/gemini-embedding-2` gravados no Supabase PostgreSQL.
-* **Paginador Dinâmico (`src/fetcher.py`):** Consulta análises pendentes em lotes de 25 registros (~325KB stdout) e formata os payloads para exportação: IDs de grupos no Monday, tags de sentimento, scores de relevância e dossiês ricos em HTML.
+* **Fetcher em Lotes & Formatador de Payloads (`src/fetcher.py`):** Consulta análises não exportadas em lotes fixos de 25 registros (`WHERE exported_to_zapier = FALSE LIMIT 25`) via `RealDictCursor`, mantendo a saída de stdout sob controle de memória. Resolve dinamicamente os IDs de grupos no Monday, mapeia status de sentimento, separa seções de narrativa vs. reação e monta dossiês analíticos completos em HTML.
 * **Integração Work OS (`src/export_to_monday.py`):** Realiza mutações GraphQL para o Monday.com, criando itens nos grupos correspondentes aos sub-temas e publicando o dossiê detalhado em HTML nos balões de atualização do item.
 * **Oráculo Interativo (`src/telegram_oraculo.py`):** Bot no Telegram permitindo consultas em linguagem natural. Converte as perguntas em vetores de 768d e executa busca por similaridade de cosseno via função SQL `match_post_analysis(%s::vector, %s, %s)`, contando com fallback relacional para as últimas 5 análises caso a busca vetorial não retorne correspondências.
 
@@ -69,7 +69,7 @@ flowchart TD
 
 Como prova de conceito em um cenário de alto volume e relevância na mídia esportiva, o motor foi configurado para o ecossistema da **Copa do Mundo FIFA 2026**:
 
-* **Escopo e Volume:** 163 vídeos de alto impacto indexados e analisados em 5 sub-tópicos estratégicos.
+* **Escopo e Volume Observado no Piloto:** Em execuções de teste reportadas durante a estruturação do piloto, 163 vídeos foram indexados e analisados ao longo dos 5 sub-tópicos configurados, demonstrando que os esquemas, o mapeamento de sentimento e os despachos para o Monday.com operam de ponta a ponta sem intervenção manual.
 * **Categorização Dinâmica de Sub-temas:**
   * `figurinhas`: Engajamento em torno do álbum Panini, itens colecionáveis e sensibilidade a preços.
   * `tatica`: Análises táticas pós-jogo, avaliações de escalações e comentários esportivos.
@@ -98,12 +98,12 @@ Caso a busca vetorial não encontre resultados satisfatórios ou ocorra indispon
 
 ---
 
-## 🔍 5. Status de Engenharia & Hardening de CI
+## 🔍 5. Status de Engenharia, CI & Remediação de Segurança
 
-Para garantir total transparência técnica e rastreabilidade:
+Para garantir absoluta transparência técnica e rastreabilidade entre as versões:
 
-* **Branch `main` (Baseline):** Contém a arquitetura fundamental da esteira, batching de API do YouTube, motor cognitivo com Dual-Sampling, esquema de banco no Supabase, exportadores GraphQL para Monday.com e configuração do piloto da Copa 2026.
-* **Branch `fix/security-ci-recovery` (Release Candidate):** Contém a estabilização completa da suíte de testes (**29 testes unitários** cobrindo contratos Pydantic, funções de extração e mapeamentos para Monday.com), alinhamento de imports e saneamento de credenciais. Esta branch está em fase de revisão para merge controlado via Pull Request na `main`.
+* **Branch Pública `main` (Baseline):** Contém a arquitetura fundamental da esteira, batching de API do YouTube, motor cognitivo com Dual-Sampling, esquema de banco no Supabase, exportadores GraphQL para Monday.com e configuração do piloto da Copa 2026. Ressalta-se que o workflow de CI padrão na `main` atualmente falha devido a um erro pré-existente de importação de modelo (`ImportError: AnalysisResult` em `tests/conftest.py`).
+* **Status do Release Candidate (Commits Locais & Backup Privado):** A correção dos imports de modelos, o saneamento de credenciais e a suíte completa de **29 testes unitários determinísticos** (cobrindo contratos Pydantic, funções de extração e mapeamentos para Monday.com) estão atualmente preservados em **commits locais na branch `fix/security-ci-recovery` e espelhados no backup privado de recuperação**. Essas correções ainda não foram mescladas na `main` pública para manter um processo disciplinado de auditoria e evitar a publicação desordenada de históricos. A integração na `main` ocorrerá via Pull Request dedicado após homologação.
 
 ---
 
@@ -179,7 +179,7 @@ trend-intelligence-engine/
 │   ├── collector.py                   # Ingestão do YouTube com estatísticas em lote
 │   ├── scraper.py                     # Extração de comentários e deduplicação
 │   ├── analyzer.py                    # Motor cognitivo Gemini 2.5 Flash e embeddings 768d
-│   ├── fetcher.py                     # Paginador dinâmico em 25 registros e formatador Monday
+│   ├── fetcher.py                     # Fetcher de lotes de 25 registros e formatador Monday
 │   ├── export_to_monday.py            # Exportador direto para GraphQL da Monday.com
 │   ├── telegram_oraculo.py            # Assistente RAG conversacional com fallback relacional
 │   ├── utils/
@@ -206,6 +206,7 @@ trend-intelligence-engine/
 - [ ] **Ingestão Multiplataforma:** Expandir a coleta além do YouTube para transcrições de vídeos curtos no TikTok e Instagram Reels.
 - [ ] **Roteamento Multi-Board no Monday:** Suporte dinâmico a múltiplos boards corporativos via cabeçalhos e tokens nas requisições do n8n.
 - [ ] **Alertas Ativos de Tendência:** Disparo de notificações proativas no Telegram quando um sub-tema apresentar picos anômalos de atrito ou engajamento.
+- [ ] **Filas de Tarefas Assíncronas:** Evoluir os scripts CLI síncronos em etapas para workers assíncronos com filas distribuídas (ex.: Celery/Redis ou loop de tarefas em asyncio) para ingestão paralela de alta concorrência.
 
 ---
 

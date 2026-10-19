@@ -11,7 +11,7 @@
 
 > **[ 🇧🇷 Ler em Português ](README.pt-br.md)**
 
-> **Executive Overview:** The **Trend Intelligence Engine** is a specialized social listening, media intelligence, and semantic analysis platform designed to extract high-conviction audience signals from digital video ecosystems. Operating on a **Software "Dark Kitchen"** architecture, heavy data ingestion, quota-optimized API batching, comment scraping, and LLM-driven cognitive synthesis run asynchronously in Python in the backstage. Enriched intelligence is then delivered directly to decision-makers via enterprise Work OS boards (**Monday.com** with rich HTML update dossiers), workflow automations (**n8n** webhooks), and interactive conversational search (**Telegram Oráculo** with pgvector RAG).
+> **Executive Overview:** The **Trend Intelligence Engine** is a specialized social listening, media intelligence, and semantic analysis platform designed to extract high-conviction audience signals from digital video ecosystems. Operating on a **Software "Dark Kitchen"** architecture, heavy data ingestion, quota-optimized API batching, comment scraping, and LLM-driven cognitive synthesis run as a **synchronous, staged execution pipeline** in Python CLI services in the backstage (with asynchronous distributed queues planned on the architectural roadmap). Enriched intelligence is then delivered directly to decision-makers via enterprise Work OS boards (**Monday.com** with rich HTML update dossiers), workflow automations (**n8n** webhooks), and interactive conversational search (**Telegram Oráculo** with pgvector RAG).
 
 ---
 
@@ -32,8 +32,8 @@ Using **Gemini 2.5 Flash** with strict structured JSON schemas and **Supabase pg
 2. **Dual-Sampling Comment Heuristic:** Passing hundreds of complete comments into an LLM context window causes unnecessary token inflation, latency, and context dispersion. The engine implements a deterministic **Dual-Sampling** strategy:
    * **Top 10 Most-Liked Comments (`top_10`):** Ingested in full (author, text, likes) to capture high-conviction qualitative critique, major counterarguments, and top community sentiment.
    * **Sample of Up to 100 Comments (`sample_100`):** Truncated to 150 characters each to provide broad sentiment density, keyword emergence, and emotional tone.
-   * *Impact:* Reduces context-window token consumption by >65% compared to raw comment feeds while retaining both depth of argument and statistical representation.
-3. **Memory Buffer Protection (Dynamic Paginator):** When serializing large database queries into CLI stdout for container runners or n8n nodes, high-volume JSON payloads can exceed Node.js's runtime buffer ceiling (`stdout maxBuffer length exceeded (1MB)`). The engine implements a cursor-based paginator processing dynamic batches of 25 records (~325KB payload), ensuring safe execution in memory-constrained container environments.
+   * *Estimated Design Impact:* Based on prompt length and tokenization estimates, this heuristic targets approximately ~65% token savings compared to passing 100 full raw comments into the prompt context. This is an architectural design estimate aimed at cost reduction and attention focus rather than a formal empirical benchmark across arbitrary corpora.
+3. **Memory Buffer Protection (Fixed-Batch Export Filtering):** When serializing database queries into CLI stdout for execution runners or n8n nodes, dumping unconstrained JSON payloads can easily breach runtime buffer limits (such as Node.js's `stdout maxBuffer length exceeded (1MB)`). In `src/fetcher.py`, the system addresses this by executing a bounded query (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) using `RealDictCursor`. Processing unexported records in fixed batches of 25 items keeps individual stdout payloads safely bounded (observed at ~300KB during pilot tests with rich HTML dossiers), advancing sequentially as records are exported and flagged in the database.
 
 ---
 
@@ -47,7 +47,7 @@ flowchart TD
     Collector --> Scraper["2. Comment Scraper\n(Relevance-sorted threads)"]
     Scraper --> Analyzer["3. AI Cognitive Engine\n(Dual-Sampling + Gemini 2.5 Flash)"]
     Analyzer --> Supabase[("4. Supabase PostgreSQL\n(pgvector 768d + match_post_analysis RPC)")]
-    Supabase --> Fetcher["5. Dynamic Paginator\n(25 records/batch, ~325KB safe chunks)"]
+    Supabase --> Fetcher["5. Batch Fetcher\n(Fixed LIMIT 25 on unexported records)"]
     Fetcher --> Distribution{"Distribution Channels"}
     Distribution --> Monday["Monday.com Work OS\n(GraphQL items + HTML update dossiers)"]
     Distribution --> N8N["n8n Webhook Dispatcher\n(Automated workflow orchestration)"]
@@ -59,7 +59,7 @@ flowchart TD
 * **Ingestion Layer (`src/collector.py`):** Config-driven keyword and subtopic queries via YouTube API v3. Uses candidate ID collection followed by batched statistics requests (up to 50 IDs/call) and filters candidates by minimum view counts and engagement ratios over elapsed time.
 * **Comment Extraction (`src/scraper.py`):** Captures relevance-ordered comment threads via `youtube.commentThreads().list`, extracting author names, text, like counts, and publication timestamps with automatic deduplication in `post_comments`.
 * **Cognitive Engine (`src/analyzer.py`):** Combines video metadata, video transcription (via `youtube-transcript-api`), and the **Dual-Sampling comment corpus** (Top 10 full + up to 100 truncated). Generates structured JSON via Gemini 2.5 Flash and produces 768-dimensional vector embeddings using `models/gemini-embedding-2` persisted into Supabase PostgreSQL.
-* **Dynamic Paginator (`src/fetcher.py`):** Queries unexported analyses in 25-record batches (~325KB stdout) and compiles formatted payloads: Monday group IDs, sentiment status badges, relevance scores, and rich HTML update dossiers.
+* **Batch Fetcher & Payload Formatter (`src/fetcher.py`):** Queries unexported analyses in fixed batches of 25 records (`WHERE exported_to_zapier = FALSE LIMIT 25`) using `RealDictCursor`, keeping stdout output comfortably under runner memory limits. It resolves Monday group IDs dynamically, maps sentiment tags, extracts narrative vs. reaction sections, and formats rich HTML briefing dossiers for export.
 * **Work OS Integration (`src/export_to_monday.py`):** Issues typed GraphQL mutations to Monday.com, creating items under dynamic subtopic groups and posting detailed HTML briefing dossiers directly into item update bubbles.
 * **Interactive Oráculo (`src/telegram_oraculo.py`):** Telegram bot allowing stakeholders to query indexed dossiers using natural language. Converts queries to 768d embeddings and executes PostgreSQL vector similarity search via `match_post_analysis(%s::vector, %s, %s)`, with automatic relational fallback to recent analyses if vector search yields no results.
 
@@ -69,7 +69,7 @@ flowchart TD
 
 To validate the framework in a realistic high-tempo sports media environment, a production pilot was configured around the **2026 FIFA World Cup** ecosystem:
 
-* **Scope & Volume:** 163 high-impact videos indexed and analyzed across 5 strategic subtopics.
+* **Scope & Observed Pilot Volume:** In initial test runs reported during the pilot setup, 163 video entries were indexed and analyzed across the 5 configured subtopics, verifying that the schema, sentiment mapping, and Monday.com export functions handled multi-topic batches without manual intervention.
 * **Dynamic Subtopic Categorization:**
   * `figurinhas`: Panini sticker album hype, collectible trading trends, and pricing sentiment.
   * `tatica`: Tactical analysis, post-match reviews, and formation debates.
@@ -98,12 +98,12 @@ If vector matching returns empty results or encounters connection timeouts, the 
 
 ---
 
-## 🔍 5. Engineering Status & CI Hardening
+## 🔍 5. Engineering Status, CI & Security Remediation
 
-To maintain strict traceability between the production baseline and ongoing improvements:
+To maintain absolute technical transparency and traceability across git baselines:
 
-* **`main` Branch (Baseline):** Contains the core pipeline architecture, YouTube batching, Dual-Sampling cognitive engine, Supabase schema, Monday.com GraphQL integration, and the 2026 World Cup pilot configuration.
-* **`fix/security-ci-recovery` Branch (Release Candidate):** Actively holds comprehensive CI/CD stabilization, test suite modernization (**29 unit tests** covering Pydantic contracts, heuristic parsers, and Monday export mappers), and credential hygiene verification. This branch is undergoing staged review and validation prior to Pull Request merge into `main`.
+* **Public `main` Branch (Baseline):** Contains the core pipeline architecture, YouTube quota batching, Dual-Sampling cognitive engine, Supabase schema, Monday.com GraphQL integration, and the 2026 World Cup pilot configuration. Note that the default GitHub Actions CI workflow on `main` currently fails on a pre-existing unaligned model import (`ImportError: AnalysisResult` in `tests/conftest.py`).
+* **Release Candidate Status (Local & Private Backup):** The resolved model imports, secret sanitization, and the expanded deterministic test suite (**29 unit tests** covering Pydantic contracts, heuristic parsers, and Monday export mappers) are currently preserved in **local commits on branch `fix/security-ci-recovery` and mirrored in the private recovery backup**. These technical fixes have not yet been merged into the public `main` branch to ensure disciplined, staged verification and avoid uncoordinated publishing of historical commits. A formal Pull Request will integrate these improvements following review.
 
 ---
 
@@ -179,7 +179,7 @@ trend-intelligence-engine/
 │   ├── collector.py                   # YouTube API ingestion with batched stats
 │   ├── scraper.py                     # Comment extraction & deduplication
 │   ├── analyzer.py                    # Gemini 2.5 Flash cognitive engine & 768d embeddings
-│   ├── fetcher.py                     # Dynamic 25-record paginator & Monday payload formatters
+│   ├── fetcher.py                     # Fixed 25-record batch fetcher & Monday payload formatter
 │   ├── export_to_monday.py            # Direct Monday.com GraphQL exporter
 │   ├── telegram_oraculo.py            # Conversational RAG assistant with relational fallback
 │   ├── utils/
@@ -206,6 +206,7 @@ trend-intelligence-engine/
 - [ ] **Multi-Platform Ingestion:** Extend collection pipeline beyond YouTube to TikTok and Instagram Reels video transcripts.
 - [ ] **Multi-Tenant Board Routing:** Support dynamic routing across multiple Monday.com boards via webhook headers in n8n.
 - [ ] **Proactive Trend Alerts:** Scheduled push notifications in Telegram when a subtopic exhibits anomalous negative friction or sudden engagement spikes.
+- [ ] **Asynchronous Task Queue:** Transition sequential batch CLI scripts to asynchronous worker queues (e.g., Celery/Redis or asyncio task loops) for high-concurrency ingestion.
 
 ---
 
