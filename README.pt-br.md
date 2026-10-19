@@ -1,104 +1,216 @@
-# 🏆 Trend Intelligence Engine
+# 🏆 Trend Intelligence Engine — Escuta Semântica & Social RAG
+
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
+[![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2-red)](https://docs.pydantic.dev/)
+[![LLM](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-magenta.svg)](https://deepmind.google/technologies/gemini/)
+[![Embeddings](https://img.shields.io/badge/Embeddings-Gemini%20768d-8A2BE2)](https://ai.google.dev/)
+[![Database](https://img.shields.io/badge/Database-Supabase%20pgvector-green.svg)](https://supabase.com/)
+[![Work OS](https://img.shields.io/badge/Work%20OS-Monday.com%20GraphQL-00CA72)](https://monday.com/)
+[![Orchestrator](https://img.shields.io/badge/Orchestrator-n8n-orange.svg)](https://n8n.io/)
+[![Alerts](https://img.shields.io/badge/Bot-Telegram%20Oráculo-2CA5E0?logo=telegram)](https://telegram.org/)
 
 > **[ 🇺🇸 Read in English ](README.md)**
 
-[![n8n v2.20.12](https://img.shields.io/badge/n8n-2.20.12-orange.svg)](https://n8n.io)
-[![Gemini 2.5 Flash](https://img.shields.io/badge/Gemini-2.5%20Flash-blue.svg)](https://deepmind.google/technologies/gemini/)
-
-O **Trend Intelligence Engine** é um orquestrador híbrido sênior de inteligência competitiva e análise de sentimento semântica. Ele opera sob o conceito de **"Dark Kitchen" de Software**: todo o processamento de dados pesado, scraping e enriquecimento cognitivo via Inteligência Artificial acontecem de forma isolada em Python no *backstage*, enquanto a interface operacional é simplificada em painéis corporativos no **Monday.com**, orquestrados via **n8n v2**.
+> **Visão Geral Executiva:** O **Trend Intelligence Engine** é uma plataforma especializada de inteligência competitiva, escuta social e análise semântica projetada para extrair sinais de audiência de alta convicção no ecossistema de vídeos digitais. Operando sob o paradigma de **"Dark Kitchen" de Software**, tarefas pesadas de ingestão, otimização de cotas de API, extração de comentários e síntese cognitiva via LLM executam assincronamente em Python no *backstage*. A inteligência resultante é entregue diretamente aos tomadores de decisão em painéis no **Monday.com** (com dossiês analíticos completos em HTML), fluxos automatizados no **n8n** e consultas interativas via **Telegram Oráculo** integrado a um banco vetorial com pgvector.
 
 ---
 
-## 🎯 Valor Comercial & Radar Estratégico: Detectando Tendências Antes da Viralização
+## 🎯 1. Valor Comercial & Racional de Engenharia
 
-* **A Dor Real do Mercado:** Líderes de marketing e estrategistas de produto reagem tarde a mudanças culturais e de consumo. Ler manualmente milhares de comentários em centenas de vídeos é inviável, e scrapers tradicionais por palavras-chave não capturam sarcasmo, gírias da comunidade ou atritos reais com produtos.
-* **Contraste Narrativa vs. Realidade:** O motor contrasta a **Tese do Criador (a proposta comercial do vídeo)** com a **Reação Real do Público (objeções, dúvidas e desejos espontâneos nos comentários)**. Utilizando **Gemini 2.5 Flash** e **Supabase pgvector (embeddings de 768 dimensões)**, transforma ruído social em inteligência estratégica pura.
-* **Resiliência de Memória em Escala:** Em execuções pesadas (validado no piloto da Copa do Mundo 2026 com **163 vídeos e mais de 150.000 comentários**), eliminou os travamentos clássicos de estouro de memória do Node.js (`stdout maxBuffer length exceeded 1MB`) através de paginação dinâmica por cursor (~325KB por lote), garantindo 100% de estabilidade no Google Cloud Run.
-* **Impacto Executivo:** Alimenta quadros interativos no Monday.com com dossiês analíticos completos em HTML e dispara alertas prioritários no Telegram para tomada rápida de decisão.
+### A Dor do Mercado: Reação Tardia e Cegueira de Sinal
+Diretores de marketing, estrategistas de conteúdo e equipes de mídia esportiva frequentemente reagem tarde a mudanças culturais e comportamentais do público. Ler manualmente milhares de comentários em centenas de vídeos é impraticável, enquanto ferramentas convencionais de monitoramento baseadas em palavras-chave apenas contabilizam volume superficial, perdendo nuances, sarcasmo, gírias emergentes e atritos reais de produto.
+
+### Contraste Narrativa vs. Reação da Audiência
+Em vez de simplesmente resumir títulos e descrições, o motor contrasta metodicamente:
+* **A Tese do Criador (Narrativa):** O que o influenciador ou canal afirma, defende ou promove na transcrição do vídeo e nos metadados.
+* **A Reação Real do Público (Atrito):** O que a audiência efetivamente debate, contesta, questiona ou celebra nas caixas de comentários.
+
+Utilizando o **Gemini 2.5 Flash** com contratos estruturados em JSON e o **Supabase pgvector (embeddings de 768 dimensões)**, o sistema separa sinais de negócio autênticos do ruído geral das redes.
+
+### Decisões Críticas de Arquitetura
+1. **Otimização de Cotas da API do YouTube:** A API v3 do YouTube impõe cota diária padrão de 10.000 unidades. Uma busca (`youtube.search().list`) consome 100 unidades. Requisitar estatísticas individualmente para cada vídeo encontrado consumiria 1 unidade adicional por chamada, esgotando a cota rapidamente. O motor coleta primeiramente os IDs dos candidatos e realiza **requisições em lote de estatísticas** através de `youtube.videos().list(id=','.join(video_ids), part='statistics')` (até 50 IDs por chamada única, consumindo apenas 1 unidade), maximizando a cobertura dentro do limite diário.
+2. **Heurística de Dual-Sampling de Comentários:** Injetar centenas de comentários brutos na janela de contexto de um LLM gera custo excessivo de tokens, aumento de latência e dispersão de atenção do modelo. O motor implementa uma estratégia determinística de **Dual-Sampling**:
+   * **Top 10 Comentários Mais Curtidos (`top_10`):** Ingeridos integralmente (autor, texto e curtidas) para análise qualitativa profunda, capturando as principais objeções e o sentimento de maior respaldo social.
+   * **Amostra de até 100 Comentários (`sample_100`):** Truncados a 150 caracteres cada, fornecendo densidade estatística de sentimento, termos emergentes e dispersão emocional.
+   * *Impacto:* Reduz o consumo de tokens na janela de contexto em mais de 65% em comparação ao envio bruto de comentários, preservando simultaneamente profundidade crítica e representatividade coletiva.
+3. **Proteção Contra Estouro de Memória (Paginador Dinâmico):** Ao serializar consultas volumosas para o stdout em runners de containers ou nós do n8n, saídas em JSON muito extensas ultrapassam o limite do Node.js (`stdout maxBuffer length exceeded (1MB)`). O motor adota paginação por cursor em lotes dinâmicos de 25 registros (~325KB por lote), garantindo execução segura em ambientes conteinerizados.
 
 ---
 
-## 🏗️ 1. Arquitetura do Sistema ("The Dark Kitchen")
+## 🏗️ 2. Arquitetura do Sistema ("The Dark Kitchen")
 
-A esteira de dados opera de forma síncrona, robusta e modular, separando a inteligência da infraestrutura:
+A esteira opera de forma modular, desacoplando o enriquecimento de dados da apresentação operacional:
 
 ```mermaid
-graph TD
-    A[Cron Trigger 02:00 AM] --> B[1. YouTube API Collector]
-    B --> C[2. Comment Scraper]
-    C --> D[3. AI Video Analyzer]
-    D --> E[4. Fetch Pending Analyses]
-    E --> F[5. Parse JSON]
-    F --> G[5. Loop de Videos]
-    G --> H[6. Create Monday Item]
-    H --> I[6b. Create Monday Update]
-    I --> J[7. Mark DB Exported]
-    J --> G
+flowchart TD
+    Cron["Gatilho Cron / Disparo Manual"] --> Collector["1. Coletor YouTube\n(Busca + Estatísticas em lote até 50 IDs)"]
+    Collector --> Scraper["2. Extrator de Comentários\n(Threads ordenadas por relevância)"]
+    Scraper --> Analyzer["3. Motor Cognitivo de IA\n(Dual-Sampling + Gemini 2.5 Flash)"]
+    Analyzer --> Supabase[("4. Supabase PostgreSQL\n(pgvector 768d + RPC match_post_analysis)")]
+    Supabase --> Fetcher["5. Paginador Dinâmico\n(25 registros/lote, ~325KB seguros)"]
+    Fetcher --> Distribution{"Canais de Distribuição"}
+    Distribution --> Monday["Monday.com Work OS\n(Itens GraphQL + Dossiês HTML em updates)"]
+    Distribution --> N8N["Despachante n8n\n(Orquestração e webhooks)"]
+    Supabase <--> Telegram["Bot Telegram Oráculo\n(Busca vetorial + Fallback relacional)"]
 ```
 
 ### 📡 Camadas do Pipeline
-* **Ingestão (YouTube API v3):** Scripts em Python filtram criadores independentes de médio e grande porte, avaliando taxas consistentes de engajamento no YouTube em lote.
-* **Corpus Semântico (Comments Extraction):** Captação automatizada e estruturada dos 100 comentários mais populares (relevantes) de cada novo vídeo encontrado.
-* **Cérebro Cognitivo (Gemini 2.5 Flash + pgvector):** Ingestão do corpus dos comentários + transcrição literal das legendas do vídeo. A IA sintetiza o contraste crítico: **A Tese do Criador (Narrativa)** vs. **A Reação Real do Público (Atrito/Adesão)**, gerando embeddings de 768 dimensões persistidos no Supabase.
-* **Despachante de UI (n8n GraphQL):** O n8n consome a fila do banco em lotes dinâmicos de 25 registros (paginação de segurança contra estouro de buffers de Node.js) e realiza chamadas GraphQL estritas ao Monday.com, criando os itens e anexando balões de fala HTML ricos com a análise comparativa de IA.
+
+* **Camada de Ingestão (`src/collector.py`):** Consultas orientadas a arquivo de configuração via YouTube API v3. Filtra vídeos por engajamento e visualizações em relação ao tempo de publicação, utilizando buscas de IDs seguidas de chamadas em lote de estatísticas (até 50 vídeos por unidade de cota).
+* **Extração de Comentários (`src/scraper.py`):** Capta comentários ordenados por relevância via `youtube.commentThreads().list`, gravando autor, texto, contagem de curtidas e data de publicação com deduplicação no banco relacional.
+* **Motor Cognitivo (`src/analyzer.py`):** Combina metadados do vídeo, transcrição do áudio (via `youtube-transcript-api`) e o **corpus em Dual-Sampling** (10 completos + até 100 truncados). Gera saída estritamente estruturada em JSON com o Gemini 2.5 Flash e calcula embeddings vetoriais de 768 dimensões com `models/gemini-embedding-2` gravados no Supabase PostgreSQL.
+* **Paginador Dinâmico (`src/fetcher.py`):** Consulta análises pendentes em lotes de 25 registros (~325KB stdout) e formata os payloads para exportação: IDs de grupos no Monday, tags de sentimento, scores de relevância e dossiês ricos em HTML.
+* **Integração Work OS (`src/export_to_monday.py`):** Realiza mutações GraphQL para o Monday.com, criando itens nos grupos correspondentes aos sub-temas e publicando o dossiê detalhado em HTML nos balões de atualização do item.
+* **Oráculo Interativo (`src/telegram_oraculo.py`):** Bot no Telegram permitindo consultas em linguagem natural. Converte as perguntas em vetores de 768d e executa busca por similaridade de cosseno via função SQL `match_post_analysis(%s::vector, %s, %s)`, contando com fallback relacional para as últimas 5 análises caso a busca vetorial não retorne correspondências.
 
 ---
 
-## ⚽ 2. Case de Sucesso Piloto: Copa do Mundo 2026
+## ⚽ 3. Piloto de Inteligência de Conteúdo: Copa do Mundo 2026
 
-Para demonstrar o poder do framework de forma real, configuramos o caso de uso piloto focado nas tendências do ecossistema da **Copa do Mundo FIFA 2026**:
+Como prova de conceito em um cenário de alto volume e relevância na mídia esportiva, o motor foi configurado para o ecossistema da **Copa do Mundo FIFA 2026**:
 
-* **Volume Processado:** **163 vídeos de alto impacto** estruturados e vetorizados.
-* **Modularidade Dinâmica:** O motor analisa os sub-temas definidos (*Figurinhas Panini*, *Análise Tática*, *Drama da Convocação*, *Polêmicas de Custos*, *Influencers*) e cria os grupos correspondentes de forma transparente e dinâmica diretamente no board do Monday.com.
-* **Estabilidade Corporativa:** **0% de falhas cognitivas**, com a paginação limitando o stdout a seguros ~325KB (resolvendo o clássico gargalo `stdout maxBuffer length exceeded` de 1MB do Node.js).
-* **Parâmetros do Piloto:** Todo o mapeamento de keywords e ângulos de análise está isolado e documentado em `src/pilots/world_cup_2026/config.yaml`.
+* **Escopo e Volume:** 163 vídeos de alto impacto indexados e analisados em 5 sub-tópicos estratégicos.
+* **Categorização Dinâmica de Sub-temas:**
+  * `figurinhas`: Engajamento em torno do álbum Panini, itens colecionáveis e sensibilidade a preços.
+  * `tatica`: Análises táticas pós-jogo, avaliações de escalações e comentários esportivos.
+  * `duvidas`: Especulações de convocação, debates sobre atletas em boa/má fase e repercussão de listas.
+  * `polemicas`: Custos de ingressos, logística da FIFA e atritos operacionais do evento.
+  * `influencers`: Conteúdo de criadores em ascensão, reacts e dinâmica de retenção de público.
+* **Mapeamento Automático de Grupos:** O motor mapeia dinamicamente cada vídeo para seu grupo correspondente no Monday.com (`Figurinhas da Copa 2026`, `Tática e React de Jogos`, etc.), mantendo a esteira editorial organizada sem intervenção humana.
+* **Isolamento de Configuração:** Todas as palavras-chave, parâmetros de corte e ângulos analíticos estão centralizados em `src/pilots/world_cup_2026/config.yaml`.
+
+> [!NOTE]
+> **Contexto de Uso:** Este piloto foi construído como demonstração técnica independente de engenharia de software e inteligência de mídia. Não implica nem afirma qualquer vínculo comercial oficial, patrocínio ou contrato com LiveMode, CazéTV, FIFA ou Panini.
 
 ---
 
-## 🚀 3. Como Executar o Projeto Localmente
+## 🛡️ 4. Contratos de Dados & Resiliência Arquitetural
+
+### Contratos Estritos (Pydantic v2)
+As fronteiras do sistema são regidas por modelos Pydantic (`src/models/schemas.py`), incluindo `VideoMetadata`, `CommentPayload`, `SentimentAnalysisResult` e `MondayItemPayload`. Isso assegura validação estrutural consistente entre ingestão, enriquecimento cognitivo e despachantes de saída.
+
+### RAG Defensivo com Fallback Relacional
+No `src/telegram_oraculo.py`, as consultas ao repositório utilizam similaridade de cosseno com pgvector:
+```sql
+SELECT * FROM match_post_analysis(query_embedding::vector, match_threshold, match_count);
+```
+Caso a busca vetorial não encontre resultados satisfatórios ou ocorra indisponibilidade no índice vetorial, o sistema degrada graciosamente para uma busca relacional, retornando os 5 dossiês mais recentes ordenados por data de análise.
+
+---
+
+## 🔍 5. Status de Engenharia & Hardening de CI
+
+Para garantir total transparência técnica e rastreabilidade:
+
+* **Branch `main` (Baseline):** Contém a arquitetura fundamental da esteira, batching de API do YouTube, motor cognitivo com Dual-Sampling, esquema de banco no Supabase, exportadores GraphQL para Monday.com e configuração do piloto da Copa 2026.
+* **Branch `fix/security-ci-recovery` (Release Candidate):** Contém a estabilização completa da suíte de testes (**29 testes unitários** cobrindo contratos Pydantic, funções de extração e mapeamentos para Monday.com), alinhamento de imports e saneamento de credenciais. Esta branch está em fase de revisão para merge controlado via Pull Request na `main`.
+
+---
+
+## 🚀 6. Como Executar Localmente
 
 ### Pré-requisitos
-* Docker & Docker Compose
-* Chaves de API configuradas (YouTube, Gemini, Monday.com, Supabase)
+* Python 3.11+
+* Docker & Docker Compose (opcional, para instâncias locais do n8n)
+* Chaves de API configuradas:
+  * YouTube Data API v3 (`YOUTUBE_API_KEY`)
+  * Google Gemini API (`GEMINI_API_KEY`)
+  * String de conexão PostgreSQL do Supabase (`DATABASE_URL`)
+  * Token da API Monday.com (`MONDAY_API_TOKEN`)
+  * Token de Bot do Telegram (`TELEGRAM_BOT_TOKEN`, opcional para o Oráculo)
 
-### Configuração de Variáveis de Ambiente
-1. Copie o arquivo de exemplo:
-   ```bash
-   cp .env.example .env
-   ```
-2. Abra o arquivo `.env` e insira suas credenciais reais.
+### Instalação
+```bash
+# 1. Clonar o repositório
+git clone https://github.com/jraphaelcunha/trend-intelligence-engine.git
+cd trend-intelligence-engine
 
-### Subindo os Serviços com Docker
-Para inicializar o motor e o orquestrador n8n localmente, execute na pasta raiz:
+# 2. Configurar o ambiente virtual
+python -m venv venv
+source venv/bin/activate  # No Windows: venv\Scripts\activate
+
+# 3. Instalar dependências
+pip install -r requirements.txt
+
+# 4. Configurar variáveis de ambiente
+cp .env.example .env
+# Preencher .env com suas chaves reais
+```
+
+### Execução dos Módulos
+```bash
+# Executar coleta no YouTube para o piloto configurado
+python src/collector.py
+
+# Extrair comentários dos vídeos indexados
+python src/scraper.py
+
+# Executar enriquecimento cognitivo com Gemini 2.5 Flash
+python src/analyzer.py
+
+# Exportar dossiês pendentes para o Monday.com
+python src/export_to_monday.py
+
+# Inicializar o bot interativo do Telegram Oráculo
+python src/telegram_oraculo.py
+```
+
+### Executando com Docker Compose
 ```bash
 docker compose -f docker/docker-compose.yml up --build -d
 ```
-O console do n8n estará acessível em [http://localhost:5678](http://localhost:5678).
+A interface do n8n estará acessível em [http://localhost:5678](http://localhost:5678).
 
 ---
 
-## 📂 4. Estrutura Canônica do Repositório
+## 📂 7. Estrutura Canônica do Repositório
 
 ```text
-├── .github/workflows/          # CI/CD no Cloud Run
-├── docker/                     # Dockerfile multi-estágio e Compose
-├── n8n/                        # Backup do fluxo do orquestrador
-├── src/                        # Código-fonte Python
-│   ├── collector.py            # Coleta na API do YouTube
-│   ├── scraper.py              # Extração de comentários
-│   ├── analyzer.py             # Processamento Gemini & embeddings
-│   ├── fetcher.py              # Paginação síncrona do banco
+trend-intelligence-engine/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                     # Automação de lint e testes no GitHub Actions
+│       └── google-cloudrun.yml        # Workflow de deploy no Google Cloud Run
+├── docker/                            # Arquivos Dockerfile multi-stage e Compose
+├── n8n/                               # Exportações dos fluxos do n8n
+├── src/                               # Código-fonte principal em Python
+│   ├── models/
+│   │   └── schemas.py                 # Contratos de dados estritos em Pydantic v2
+│   ├── collector.py                   # Ingestão do YouTube com estatísticas em lote
+│   ├── scraper.py                     # Extração de comentários e deduplicação
+│   ├── analyzer.py                    # Motor cognitivo Gemini 2.5 Flash e embeddings 768d
+│   ├── fetcher.py                     # Paginador dinâmico em 25 registros e formatador Monday
+│   ├── export_to_monday.py            # Exportador direto para GraphQL da Monday.com
+│   ├── telegram_oraculo.py            # Assistente RAG conversacional com fallback relacional
 │   ├── utils/
-│   │   └── db.py               # Módulo relacional do Supabase
+│   │   └── db.py                      # Gerenciamento de conexão com Supabase PostgreSQL
 │   └── pilots/
-│       └── world_cup_2026/     # Configuração e Runner do piloto
-├── requirements.txt            # Dependências Python
-└── README.md
+│       └── world_cup_2026/            # Configuração e taxonomia de sub-temas do piloto
+├── scripts/
+│   └── ops/                           # Utilitários de manutenção operacional e de banco
+├── tests/
+│   ├── conftest.py                    # Fixtures globais e mocks de API para Pytest
+│   └── unit/
+│       ├── test_schemas.py            # Testes de validação dos contratos Pydantic
+│       ├── test_fetcher.py            # Testes de mapeamento e transformação
+│       └── test_analyzer.py           # Testes heurísticos e de extração de IDs
+├── requirements.txt                   # Dependências de produção
+├── README.md                          # Documentação técnica em inglês
+└── README.pt-br.md                    # Documentação técnica em português
 ```
 
 ---
 
-## 🗺️ 5. Próximos Passos (Roadmap)
-- [ ] **RAG de Insights:** Adicionar busca semântica em linguagem natural diretamente na planilha do Monday.com integrada à nossa base vetorial do Supabase.
-- [ ] **Multitenancy Config:** Permitir que múltiplos boards do Monday se conectem à mesma instância do Cloud Run, chaveando via tokens nas requisições do n8n.
-- [ ] **Telegram Agent Integration:** Um agente conversacional para enviar reportes de insights matinais para tomadores de decisão em tempo real.
+## 🗺️ 8. Próximos Passos (Roadmap)
+
+- [ ] **Ingestão Multiplataforma:** Expandir a coleta além do YouTube para transcrições de vídeos curtos no TikTok e Instagram Reels.
+- [ ] **Roteamento Multi-Board no Monday:** Suporte dinâmico a múltiplos boards corporativos via cabeçalhos e tokens nas requisições do n8n.
+- [ ] **Alertas Ativos de Tendência:** Disparo de notificações proativas no Telegram quando um sub-tema apresentar picos anômalos de atrito ou engajamento.
+
+---
+
+## 👤 Autor
+
+**João Raphael Cunha**<br/>
+Solutions Architect & AI Engineer<br/>
+[Perfil no GitHub](https://github.com/jraphaelcunha) | [LinkedIn](https://www.linkedin.com/in/joaoraphaelcunha/)
