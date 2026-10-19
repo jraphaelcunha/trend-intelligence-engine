@@ -2,6 +2,7 @@
 Unit tests for Telegram RAG Oráculo service in src/telegram_oraculo.py.
 """
 
+import asyncio
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,7 +13,6 @@ if "telegram" not in sys.modules:
     sys.modules["telegram.ext"] = mock_telegram_ext
 
 import psycopg2
-import pytest
 
 from src.telegram_oraculo import (
     generate_rag_answer,
@@ -121,20 +121,18 @@ def test_generate_rag_answer_with_records():
         assert "Preço alto dos ingressos" in prompt_sent
 
 
-@pytest.mark.anyio
-async def test_telegram_start_command():
+def test_telegram_start_command():
     """Verify /start command sends welcome message."""
     mock_update = MagicMock()
     mock_update.message.reply_text = AsyncMock()
     mock_context = MagicMock()
 
-    await start(mock_update, mock_context)
+    asyncio.run(start(mock_update, mock_context))
     mock_update.message.reply_text.assert_awaited_once()
     assert "Oráculo do Trend Intelligence Engine" in mock_update.message.reply_text.call_args[0][0]
 
 
-@pytest.mark.anyio
-async def test_telegram_handle_message_with_fallback():
+def test_telegram_handle_message_with_fallback():
     """Verify handle_message triggers relational fallback when vector search returns 0 results."""
     mock_update = MagicMock()
     mock_update.message.text = "Quais as principais polêmicas?"
@@ -149,7 +147,7 @@ async def test_telegram_handle_message_with_fallback():
         with patch("src.telegram_oraculo.search_supabase_vector", return_value=[]):
             with patch("src.telegram_oraculo.search_supabase_fallback", return_value=fallback_records) as mock_fallback:
                 with patch("src.telegram_oraculo.generate_rag_answer", return_value="Resposta gerada") as mock_rag:
-                    await handle_message(mock_update, mock_context)
+                    asyncio.run(handle_message(mock_update, mock_context))
                     mock_fallback.assert_called_once()
                     mock_rag.assert_called_once_with("Quais as principais polêmicas?", fallback_records)
                     mock_thinking.edit_text.assert_awaited_once_with("Resposta gerada")
