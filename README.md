@@ -25,7 +25,7 @@ Rather than merely summarizing video descriptions, the engine systematically con
 * **The Creator's Thesis (The Narrative):** What the creator claims, defends, or sells in the video transcription and metadata.
 * **The Audience's Real Reaction (The Friction):** What viewers actively debate, reject, question, or celebrate across the comment threads.
 
-Using **Gemini 2.5 Flash** with strict structured JSON schemas and **Supabase pgvector (768-dimensional embeddings)**, the engine separates authentic business signals from background noise.
+Using **Gemini 2.5 Flash** with structured JSON output and **Supabase pgvector (768-dimensional embeddings)**, the engine separates authentic business signals from background noise.
 
 ### Key Architectural Decisions
 1. **YouTube API Quota Batching:** The YouTube Data API v3 enforces a default daily quota limit of 10,000 units. A standard search request (`youtube.search().list`) consumes 100 units. Requesting statistics individually for each returned video would consume 1 unit per call and quickly exhaust quotas. The engine gathers candidate video IDs first, then performs **batched statistics requests** via `youtube.videos().list(id=','.join(video_ids), part='statistics')` (up to 50 video IDs per single API call consuming only 1 unit), enabling high-coverage discovery within strict API constraints.
@@ -33,7 +33,7 @@ Using **Gemini 2.5 Flash** with strict structured JSON schemas and **Supabase pg
    * **Top 10 Most-Liked Comments (`top_10`):** Ingested in full (author, text, likes) to capture high-conviction qualitative critique, major counterarguments, and top community sentiment.
    * **Sample of Up to 100 Comments (`sample_100`):** Truncated to 150 characters each to provide broad sentiment density, keyword emergence, and emotional tone.
    * *Estimated Design Impact:* Based on prompt length and tokenization estimates, this heuristic targets approximately ~65% token savings compared to passing 100 full raw comments into the prompt context. This is an architectural design estimate aimed at cost reduction and attention focus rather than a formal empirical benchmark across arbitrary corpora.
-3. **Memory Buffer Protection (Fixed-Batch Export Filtering):** When serializing database queries into CLI stdout for execution runners or n8n nodes, dumping unconstrained JSON payloads can easily breach runtime buffer limits (such as Node.js's `stdout maxBuffer length exceeded (1MB)`). In `src/fetcher.py`, the system addresses this by executing a bounded query (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) using `RealDictCursor`. Processing unexported records in fixed batches of 25 items keeps individual stdout payloads safely bounded (observed at ~300KB during pilot tests with rich HTML dossiers), advancing sequentially as records are exported and flagged in the database.
+3. **Buffer Management (Bounded Record Batching):** When serializing database queries to stdout for container runners or n8n nodes, unbounded query outputs risk triggering runtime buffer exceptions (such as Node.js's `stdout maxBuffer length exceeded (1MB)`). In `src/fetcher.py`, the query limits results by record count (`WHERE a.exported_to_zapier = FALSE ORDER BY a.id ASC LIMIT 25`) using `RealDictCursor`. While `LIMIT 25` bounds the quantity of records rather than imposing an absolute byte ceiling, in practice with typical metadata and HTML update dossiers it kept observed payload sizes around ~300KB in pilot tests, advancing sequentially as records are exported and marked in the database.
 
 ---
 
@@ -47,7 +47,7 @@ flowchart TD
     Collector --> Scraper["2. Comment Scraper\n(Relevance-sorted threads)"]
     Scraper --> Analyzer["3. AI Cognitive Engine\n(Dual-Sampling + Gemini 2.5 Flash)"]
     Analyzer --> Supabase[("4. Supabase PostgreSQL\n(pgvector 768d + match_post_analysis RPC)")]
-    Supabase --> Fetcher["5. Batch Fetcher\n(Fixed LIMIT 25 on unexported records)"]
+    Supabase --> Fetcher["5. Batch Fetcher\n(Bounded LIMIT 25 on unexported records)"]
     Fetcher --> Distribution{"Distribution Channels"}
     Distribution --> Monday["Monday.com Work OS\n(GraphQL items + HTML update dossiers)"]
     Distribution --> N8N["n8n Webhook Dispatcher\n(Automated workflow orchestration)"]
@@ -59,7 +59,7 @@ flowchart TD
 * **Ingestion Layer (`src/collector.py`):** Config-driven keyword and subtopic queries via YouTube API v3. Uses candidate ID collection followed by batched statistics requests (up to 50 IDs/call) and filters candidates by minimum view counts and engagement ratios over elapsed time.
 * **Comment Extraction (`src/scraper.py`):** Captures relevance-ordered comment threads via `youtube.commentThreads().list`, extracting author names, text, like counts, and publication timestamps with automatic deduplication in `post_comments`.
 * **Cognitive Engine (`src/analyzer.py`):** Combines video metadata, video transcription (via `youtube-transcript-api`), and the **Dual-Sampling comment corpus** (Top 10 full + up to 100 truncated). Generates structured JSON via Gemini 2.5 Flash and produces 768-dimensional vector embeddings using `models/gemini-embedding-2` persisted into Supabase PostgreSQL.
-* **Batch Fetcher & Payload Formatter (`src/fetcher.py`):** Queries unexported analyses in fixed batches of 25 records (`WHERE exported_to_zapier = FALSE LIMIT 25`) using `RealDictCursor`, keeping stdout output comfortably under runner memory limits. It resolves Monday group IDs dynamically, maps sentiment tags, extracts narrative vs. reaction sections, and formats rich HTML briefing dossiers for export.
+* **Batch Fetcher & Payload Formatter (`src/fetcher.py`):** Queries unexported analyses in batches of up to 25 records (`WHERE exported_to_zapier = FALSE ORDER BY id ASC LIMIT 25`) using `RealDictCursor`. While this limits the record count rather than enforcing a strict byte cap, it substantially mitigates stdout buffer overflow risks in execution runners. It resolves Monday group IDs dynamically, maps sentiment tags, extracts narrative vs. reaction sections, and formats rich HTML briefing dossiers for export.
 * **Work OS Integration (`src/export_to_monday.py`):** Issues typed GraphQL mutations to Monday.com, creating items under dynamic subtopic groups and posting detailed HTML briefing dossiers directly into item update bubbles.
 * **Interactive Oráculo (`src/telegram_oraculo.py`):** Telegram bot allowing stakeholders to query indexed dossiers using natural language. Converts queries to 768d embeddings and executes PostgreSQL vector similarity search via `match_post_analysis(%s::vector, %s, %s)`, with automatic relational fallback to recent analyses if vector search yields no results.
 
@@ -86,8 +86,8 @@ To validate the framework in a realistic high-tempo sports media environment, a 
 
 ## 🛡️ 4. Data Contracts & Architecture Resilience
 
-### Strict Data Contracts (Pydantic v2)
-System boundaries are governed by explicit Pydantic models (`src/models/schemas.py`), including `VideoMetadata`, `CommentPayload`, `SentimentAnalysisResult`, and `MondayItemPayload`. This ensures schema validation between data collection, AI cognitive processing, and downstream dispatchers.
+### Data Contracts & Schemas (Pydantic v2)
+Typed data schemas are formally declared using Pydantic v2 in `src/models/schemas.py` (`VideoMetadata`, `CommentPayload`, `SentimentAnalysisResult`, and `MondayItemPayload`), specifying the expected interface contracts between collection, analysis, and distribution layers. In the current runtime pipeline, intermediate data flows primarily as Python dictionaries, with full end-to-end runtime model validation actively being extended across all pipeline stages.
 
 ### Defensive RAG with Relational Fallback
 In `src/telegram_oraculo.py`, queries against the knowledge base use cosine similarity over pgvector embeddings:
@@ -98,12 +98,12 @@ If vector matching returns empty results or encounters connection timeouts, the 
 
 ---
 
-## 🔍 5. Engineering Status, CI & Security Remediation
+## 🔍 5. Engineering Status & CI Alignment
 
-To maintain absolute technical transparency and traceability across git baselines:
+To maintain absolute technical transparency regarding the repository baseline:
 
-* **Public `main` Branch (Baseline):** Contains the core pipeline architecture, YouTube quota batching, Dual-Sampling cognitive engine, Supabase schema, Monday.com GraphQL integration, and the 2026 World Cup pilot configuration. Note that the default GitHub Actions CI workflow on `main` currently fails on a pre-existing unaligned model import (`ImportError: AnalysisResult` in `tests/conftest.py`).
-* **Release Candidate Status (Local & Private Backup):** The resolved model imports, secret sanitization, and the expanded deterministic test suite (**29 unit tests** covering Pydantic contracts, heuristic parsers, and Monday export mappers) are currently preserved in **local commits on branch `fix/security-ci-recovery` and mirrored in the private recovery backup**. These technical fixes have not yet been merged into the public `main` branch to ensure disciplined, staged verification and avoid uncoordinated publishing of historical commits. A formal Pull Request will integrate these improvements following review.
+* **Public `main` Branch (Baseline):** Contains the foundational pipeline architecture, YouTube quota batching, Dual-Sampling cognitive engine, Supabase database schema, Monday.com GraphQL integration, and the 2026 World Cup pilot configuration. Note that the default GitHub Actions CI workflow on `main` currently fails on a pre-existing legacy model import (`ImportError: AnalysisResult` in `tests/conftest.py`).
+* **Staged Engineering Improvements (Local & Private Backup):** The corrected model imports, environment configuration hardening, and the expanded deterministic test suite (**29 unit tests** covering data contracts, heuristic parsers, and Monday export mappers) are currently maintained in local staging commits (and mirrored in private backup). These updates are queued for review and integration in an upcoming release cycle, preserving a disciplined verification history.
 
 ---
 
@@ -175,11 +175,11 @@ trend-intelligence-engine/
 ├── n8n/                               # Exported n8n orchestration workflows
 ├── src/                               # Core Python source code
 │   ├── models/
-│   │   └── schemas.py                 # Pydantic v2 strict data contracts
+│   │   └── schemas.py                 # Pydantic v2 data contracts
 │   ├── collector.py                   # YouTube API ingestion with batched stats
 │   ├── scraper.py                     # Comment extraction & deduplication
 │   ├── analyzer.py                    # Gemini 2.5 Flash cognitive engine & 768d embeddings
-│   ├── fetcher.py                     # Fixed 25-record batch fetcher & Monday payload formatter
+│   ├── fetcher.py                     # Bounded 25-record batch fetcher & Monday payload formatter
 │   ├── export_to_monday.py            # Direct Monday.com GraphQL exporter
 │   ├── telegram_oraculo.py            # Conversational RAG assistant with relational fallback
 │   ├── utils/
