@@ -65,11 +65,11 @@ flowchart TD
 
 ---
 
-## ⚽ 3. Media Intelligence Pilot: 2026 FIFA World Cup
+## ⚽ 3. Topic Configuration: 2026 FIFA World Cup
 
-To validate the framework in a realistic high-tempo sports media environment, a production pilot was configured around the **2026 FIFA World Cup** ecosystem:
+As part of the Trend Intelligence Engine work developed in early 2026, the system was configured to analyze topics related to the **2026 FIFA World Cup** ecosystem:
 
-* **Scope & Observed Pilot Volume:** In initial test runs reported during the pilot setup, 163 video entries were indexed and analyzed across the 5 configured subtopics, verifying that the schema, sentiment mapping, and Monday.com export functions handled multi-topic batches without manual intervention.
+* **Reported Execution Volume:** Available project records report 163 indexed and analyzed video entries across five configured subtopics. This is a reported execution figure, not a claim of independently audited production throughput.
 * **Dynamic Subtopic Categorization:**
   * `figurinhas`: Panini sticker album hype, collectible trading trends, and pricing sentiment.
   * `tatica`: Tactical analysis, post-match reviews, and formation debates.
@@ -80,7 +80,6 @@ To validate the framework in a realistic high-tempo sports media environment, a 
 * **Configuration Isolation:** All search queries, minimum engagement thresholds, and analysis angles are decoupled into `src/pilots/world_cup_2026/config.yaml`.
 
 > [!NOTE]
-> **Use Case Context:** This pilot was built as an independent engineering demonstration of sports media intelligence and audience sentiment analysis. It does not represent an official partnership, commercial contract, or endorsement by LiveMode, CazéTV, FIFA, or Panini.
 
 ---
 
