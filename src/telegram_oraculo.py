@@ -60,7 +60,7 @@ def search_supabase_vector(query_embedding, match_threshold=0.3, match_count=5):
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
         logger.info(f"Busca vetorial retornou {len(results)} resultados")
         return results
-    except Exception as e:
+    except psycopg2.Error as e:
         logger.error(f"Erro na busca vetorial: {e}")
         return []
     finally:
@@ -88,7 +88,7 @@ def search_supabase_fallback():
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
         logger.info(f"Fallback retornou {len(results)} resultados")
         return results
-    except Exception as e:
+    except psycopg2.Error as e:
         logger.error(f"Erro no fallback: {e}")
         return []
     finally:
@@ -182,7 +182,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await thinking_msg.edit_text(answer)
         logger.info("Resposta enviada com sucesso!")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - Telegram top-level event handler must catch all errors to reply to user
         error_msg = f"Erro: {type(e).__name__}: {e}"
         logger.error(error_msg)
         logger.error(traceback.format_exc())

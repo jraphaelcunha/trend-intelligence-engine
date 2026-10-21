@@ -1,9 +1,10 @@
-﻿"""
+"""
 Unit tests for Pydantic v2 data contracts and models.
 """
 
 import pytest
 from pydantic import ValidationError
+
 from src.models.schemas import (
     BatchExportStatus,
     CommentPayload,

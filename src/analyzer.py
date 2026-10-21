@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 
 import google.generativeai as genai
 import yaml
@@ -9,6 +10,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import psycopg2
+
 from src.utils.db import get_connection
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -43,10 +46,10 @@ def extract_video_id(url):
 def get_transcript(video_id):
     """Obtém a transcrição do vídeo via youtube-transcript-api."""
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['pt', 'en', 'pt-BR'])
-        full_text = " ".join([item['text'] for item in transcript_list])
+        transcript_list = YouTubeTranscriptApi().fetch(video_id, languages=['pt', 'en', 'pt-BR'])
+        full_text = " ".join([item.text for item in transcript_list])
         return full_text
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - youtube_transcript_api can raise various API and network exceptions
         print(f"  ⚠️ Legenda indisponível para {video_id}: {type(e).__name__}")
         return "Legenda indisponível."
 
@@ -101,7 +104,7 @@ def get_pending_posts(limit=10):
         
         return result
         
-    except Exception as e:
+    except (psycopg2.Error, ValueError) as e:
         print(f"Erro no banco ao carregar posts: {e}")
         return []
     finally:
@@ -202,7 +205,7 @@ def save_analysis(post_id, analysis_json, existing_analysis_id=None):
             cursor.execute(query, values)
             print("  ✅ Novo Dossiê e Vetores salvos no banco!")
             
-    except Exception as e:
+    except (psycopg2.Error, ValueError) as e:
         print(f"  ❌ Erro ao salvar análise ou embedding: {e}")
     finally:
         if 'conn' in locals() and conn:
@@ -284,7 +287,7 @@ def analyze_post(post, comments, active_config):
         save_analysis(post['id'], analysis_result, post.get("existing_analysis_id"))
         return True
         
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - LLM generation, parsing, or network failure
         print(f"  ❌ Erro ao processar IA para o post {post['id']}: {e}")
         return False
 

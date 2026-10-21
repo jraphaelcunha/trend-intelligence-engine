@@ -88,11 +88,13 @@ def export_to_n8n():
             conn.commit()
             print(f"Marcadas {len(exported_ids)} análises como 'Exportadas' no Supabase para evitar duplicação.")
 
-    except Exception as e:
+    except (psycopg2.Error, requests.RequestException, ValueError) as e:
         print(f"Erro na execução do motor de exportação n8n: {e}")
     finally:
-        if 'cur' in locals(): cur.close()
-        if 'conn' in locals(): conn.close()
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
 
 if __name__ == "__main__":
     export_to_n8n()

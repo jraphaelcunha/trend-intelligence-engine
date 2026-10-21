@@ -21,6 +21,7 @@ sys.path.append(os.path.dirname(__file__))
 from src.fetcher import (
     DEFAULT_GROUP_TITLE,
     SUBTOPIC_GROUP_MAP,
+    clean_string,
     create_monday_group,
     extract_section,
     format_pain_points_and_sentiment,
@@ -260,11 +261,13 @@ def run_export():
         print(f"✅ EXPORTAÇÃO FINALIZADA! {success_count}/{len(records)} posts exportados com sucesso.")
         print("="*60)
 
-    except Exception as e:
+    except (psycopg2.Error, requests.RequestException, ValueError) as e:
         print(f"❌ Ocorreu uma exceção: {e}")
     finally:
-        if 'cur' in locals() and cur: cur.close()
-        if 'conn' in locals() and conn: conn.close()
+        if 'cur' in locals() and cur:
+            cur.close()
+        if 'conn' in locals() and conn:
+            conn.close()
 
 if __name__ == "__main__":
     run_export()

@@ -8,6 +8,8 @@ from googleapiclient.discovery import build
 
 # Ensure the root of the project is in python path for absolute imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import psycopg2
+from googleapiclient.errors import HttpError
 from psycopg2.extras import execute_values
 
 from src.utils.db import get_connection
@@ -16,12 +18,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
-if not YOUTUBE_API_KEY:
-    print("Erro: YOUTUBE_API_KEY não configurada no arquivo .env!")
-    sys.exit(1)
-
-# Inicializar cliente do YouTube API
-youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY, static_discovery=False)
+youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY, static_discovery=False) if YOUTUBE_API_KEY else None
 
 def extract_video_id(url):
     """Extrai o ID do vídeo de uma URL do YouTube."""
@@ -46,7 +43,7 @@ def get_videos_needing_comments():
         """
         cursor.execute(query)
         videos = cursor.fetchall()
-    except Exception as e:
+    except (psycopg2.Error, ValueError) as e:
         print(f"Erro ao buscar vídeos no banco: {e}")
     finally:
         if 'conn' in locals() and conn:
@@ -55,6 +52,9 @@ def get_videos_needing_comments():
 
 def fetch_comments_via_api(video_id, max_results=100):
     """Obtém os comentários mais populares do vídeo usando a API oficial do YouTube."""
+    if not youtube:
+        print(f"  ⚠️ YouTube API não configurada para buscar comentários do vídeo {video_id}")
+        return []
     comments = []
     try:
         response = youtube.commentThreads().list(
@@ -77,7 +77,7 @@ def fetch_comments_via_api(video_id, max_results=100):
                 "likes_count": int(snippet.get("likeCount", 0)),
                 "published_at": pub_at
             })
-    except Exception as e:
+    except (HttpError, Exception) as e:  # noqa: BLE001 - YouTube API can raise HttpError or network/parsing exceptions
         err_msg = str(e)
         if "commentsDisabled" in err_msg:
             print(f"  ⚠️ Comentários desativados para o vídeo ID {video_id}")
@@ -119,7 +119,7 @@ def save_comments_to_db(post_id, comments_data):
         
         execute_values(cursor, insert_query, values_to_insert)
         print(f"  ✅ Salvos {len(comments_data)} comentários para o vídeo no banco de dados!")
-    except Exception as e:
+    except (psycopg2.Error, ValueError) as e:
         print(f"  ❌ Erro ao salvar comentários no banco: {e}")
     finally:
         if 'conn' in locals() and conn:
@@ -127,6 +127,10 @@ def save_comments_to_db(post_id, comments_data):
 
 def run_comment_scraper():
     print("=== INICIANDO COLETA DE COMENTÁRIOS VIA YOUTUBE API ===")
+    if not YOUTUBE_API_KEY or not youtube:
+        print("Erro: YOUTUBE_API_KEY não configurada no arquivo .env!")
+        return
+
     videos = get_videos_needing_comments()
     
     if not videos:

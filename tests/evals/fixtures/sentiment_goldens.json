@@ -1,0 +1,68 @@
+[
+  {
+    "id": "eval_001",
+    "video_title": "Táticas Revolucionárias para a Copa de 2026",
+    "model_sentiment_output": "Altamente positivo, audiência elogiando muito o criador",
+    "comment_sample": [
+      "Simplesmente genial essa análise, bom demais!",
+      "Sensacional! Ótimo trabalho."
+    ],
+    "expected_sentiment": "Positivo",
+    "labeled_pain_points": ["Falta de análise tática de qualidade na TV aberta"]
+  },
+  {
+    "id": "eval_002",
+    "video_title": "Comemoração e Bastidores da Seleção",
+    "model_sentiment_output": "Sentimento de sucesso e clima muito positivo",
+    "comment_sample": [
+      "Muito legal ver o bom clima.",
+      "Vibe maravilhosa, tô animado demais pra Copa!"
+    ],
+    "expected_sentiment": "Positivo",
+    "labeled_pain_points": []
+  },
+  {
+    "id": "eval_003",
+    "video_title": "O Desastre da Convocação: Entenda os Erros",
+    "model_sentiment_output": "Forte crítica da torcida e tom muito negativo",
+    "comment_sample": [
+      "Convocação vergonhosa, esse técnico é horrível e ruim.",
+      "Mais um vexame anunciado."
+    ],
+    "expected_sentiment": "Negativo",
+    "labeled_pain_points": ["Insatisfação com a convocação", "Técnico ultrapassado"]
+  },
+  {
+    "id": "eval_004",
+    "video_title": "Preço dos Ingressos da Copa 2026 Dispara",
+    "model_sentiment_output": "Péssima repercussão e reclamação geral sobre custos",
+    "comment_sample": [
+      "Um absurdo esse valor, ruim demais.",
+      "FIFA elitizando o futebol, péssimo."
+    ],
+    "expected_sentiment": "Negativo",
+    "labeled_pain_points": ["Custo proibitivo de ingressos", "Elitização do esporte"]
+  },
+  {
+    "id": "eval_005",
+    "video_title": "Estatísticas Frias dos Grupos e Sedes",
+    "model_sentiment_output": "Neutro, foco estritamente descritivo em dados logísticos",
+    "comment_sample": [
+      "Ok, faz sentido a divisão das sedes.",
+      "Dados informativos."
+    ],
+    "expected_sentiment": "Neutro",
+    "labeled_pain_points": ["Logística de deslocamento"]
+  },
+  {
+    "id": "eval_006",
+    "video_title": "Tabela Completa de Horários das Partidas",
+    "model_sentiment_output": "Público indiferente e neutro, apenas consultando informações",
+    "comment_sample": [
+      "Valeu pela informação dos horários.",
+      "Tabela salva."
+    ],
+    "expected_sentiment": "Neutro",
+    "labeled_pain_points": ["Fuso horário desfavorável"]
+  }
+]
