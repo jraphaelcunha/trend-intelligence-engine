@@ -6,11 +6,15 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import psycopg2
+
 from src.analyzer import (
     analyze_post,
     extract_video_id,
+    get_pending_posts,
     get_subtopic_context,
     get_transcript,
+    run_analysis,
     save_analysis,
 )
 
@@ -244,7 +248,157 @@ def test_save_analysis_update():
 
     with patch("src.analyzer.genai.embed_content", return_value={"embedding": [0.4, 0.5, 0.6]}):
         with patch("src.analyzer.get_connection", return_value=mock_conn):
-            save_analysis(post_id=42, analysis_json=analysis_data, existing_analysis_id=999)
+            result = save_analysis(post_id=42, analysis_json=analysis_data, existing_analysis_id=999)
+            assert result is True
             mock_cur.execute.assert_called_once()
             assert "UPDATE public.post_ai_analysis" in mock_cur.execute.call_args[0][0]
             mock_conn.close.assert_called_once()
+
+
+def test_save_analysis_db_error_returns_false():
+    """Verify save_analysis catches psycopg2.Error and returns False safely."""
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_cur.execute.side_effect = psycopg2.DatabaseError("Connection lost")
+    mock_conn.cursor.return_value = mock_cur
+
+    analysis_data = {
+        "video_tone": "Neutro",
+        "editing_style": "Padrão",
+        "content_summary": "Resumo",
+        "video_narrative": "Narrativa",
+        "public_reaction": "Reação",
+        "narrative_vs_reaction": "Comparação",
+        "audience_pain_points": [],
+        "public_sentiment": "Neutro",
+        "algorithm_relevance_score": 5.0,
+        "strategic_insights": "Insights",
+    }
+
+    with patch("src.analyzer.genai.embed_content", return_value={"embedding": [0.1, 0.2]}):
+        with patch("src.analyzer.get_connection", return_value=mock_conn):
+            result = save_analysis(post_id=42, analysis_json=analysis_data)
+            assert result is False
+            mock_conn.close.assert_called_once()
+
+
+def test_save_analysis_value_error_returns_false():
+    """Verify save_analysis catches ValueError and returns False safely."""
+    with patch("src.analyzer.genai.embed_content", side_effect=ValueError("Invalid embedding format")):
+        result = save_analysis(post_id=42, analysis_json={})
+        assert result is False
+
+
+def test_analyze_post_db_failure_returns_false():
+    """Verify analyze_post returns False when LLM succeeds but database persistence fails."""
+    post = {"id": 10, "url": "https://www.youtube.com/watch?v=vid10", "title": "T", "description": "D"}
+    mock_config = {"subtopics": [], "analysis": {}}
+
+    mock_llm_response = {
+        "video_tone": "Técnico",
+        "editing_style": "Padrão",
+        "content_summary": "Resumo",
+        "video_narrative": "Narrativa",
+        "public_reaction": "Reação",
+        "narrative_vs_reaction": "Comparação",
+        "audience_pain_points": [],
+        "public_sentiment": "Positivo",
+        "algorithm_relevance_score": 8.0,
+        "strategic_insights": "Insights",
+    }
+
+    mock_gen_result = MagicMock()
+    mock_gen_result.text = json.dumps(mock_llm_response)
+
+    with patch("src.analyzer.get_transcript", return_value=""):
+        with patch("src.analyzer.model.generate_content", return_value=mock_gen_result):
+            with patch("src.analyzer.save_analysis", return_value=False) as mock_save:
+                success = analyze_post(post, [], mock_config)
+                assert success is False
+                mock_save.assert_called_once()
+
+
+def test_run_analysis_queue_exhaustion():
+    """Verify run_analysis terminates immediately when get_pending_posts returns empty."""
+    with patch("src.analyzer.load_config", return_value={"analysis": {}}):
+        with patch("src.analyzer.get_pending_posts", return_value=[]):
+            with patch("src.analyzer.analyze_post") as mock_analyze:
+                result = run_analysis(max_rounds=5)
+                mock_analyze.assert_not_called()
+                assert result == 0
+
+
+def test_run_analysis_max_rounds_limit():
+    """Verify run_analysis strictly terminates when max_rounds limit is reached."""
+    mock_post = ({"id": 1, "title": "Vídeo", "views": 100}, [])
+
+    with patch("src.analyzer.load_config", return_value={"analysis": {}}):
+        with patch("src.analyzer.get_pending_posts", return_value=[mock_post]) as mock_get:
+            with patch("src.analyzer.analyze_post", return_value=True) as mock_analyze:
+                with patch("src.analyzer.time.sleep") as mock_sleep:
+                    result = run_analysis(max_rounds=3)
+                    assert mock_get.call_count == 3
+                    assert mock_analyze.call_count == 3
+                    assert result == 3
+                    assert mock_sleep.call_count == 2
+
+
+def test_run_analysis_skips_failed_posts_in_subsequent_rounds():
+    """Verify failing post is added to failed_post_ids and skipped in subsequent rounds."""
+    post_failing = ({"id": 101, "title": "Failing Video", "views": 500}, [])
+
+    def mock_get_pending(limit=20, exclude_ids=None):
+        if exclude_ids and 101 in exclude_ids:
+            return []
+        return [post_failing]
+
+    with patch("src.analyzer.load_config", return_value={"analysis": {}}):
+        with patch("src.analyzer.get_pending_posts", side_effect=mock_get_pending) as mock_get:
+            with patch("src.analyzer.analyze_post", return_value=False) as mock_analyze:
+                with patch("src.analyzer.time.sleep"):
+                    result = run_analysis(max_rounds=5)
+                    # analyze_post should be called only ONCE for post 101
+                    assert mock_analyze.call_count == 1
+                    assert result == 0
+                    assert mock_get.call_count == 2
+                    second_call_exclude = mock_get.call_args_list[1].kwargs.get("exclude_ids")
+                    assert 101 in second_call_exclude
+
+
+def test_run_analysis_multi_round_success():
+    """Verify run_analysis processes multi-round queue with mocked time.sleep until queue empties."""
+    round1_posts = [
+        ({"id": 1, "title": "V1", "views": 100}, []),
+        ({"id": 2, "title": "V2", "views": 200}, []),
+    ]
+    round2_posts = [
+        ({"id": 3, "title": "V3", "views": 300}, []),
+    ]
+
+    calls = [round1_posts, round2_posts, []]
+
+    with patch("src.analyzer.load_config", return_value={"analysis": {}}):
+        with patch("src.analyzer.get_pending_posts", side_effect=lambda limit=20, exclude_ids=None: calls.pop(0) if calls else []):
+            with patch("src.analyzer.analyze_post", return_value=True) as mock_analyze:
+                with patch("src.analyzer.time.sleep") as mock_sleep:
+                    result = run_analysis(max_rounds=5)
+                    assert mock_analyze.call_count == 3
+                    assert result == 3
+                    assert mock_sleep.call_count == 2
+
+
+def test_get_pending_posts_with_exclude_ids():
+    """Verify get_pending_posts constructs SQL with exclude_ids clause."""
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    mock_cur.fetchall.return_value = []
+    mock_conn.cursor.return_value = mock_cur
+
+    with patch("src.analyzer.get_connection", return_value=mock_conn):
+        posts = get_pending_posts(limit=10, exclude_ids={101, 102})
+        assert posts == []
+        mock_cur.execute.assert_called_once()
+        query, params = mock_cur.execute.call_args[0]
+        assert "p.id != ALL(%s)" in query
+        assert [101, 102] in params or [102, 101] in params or any(isinstance(p, list) and set(p) == {101, 102} for p in params)
+

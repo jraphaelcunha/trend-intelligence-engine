@@ -1,6 +1,6 @@
 # 🏆 Trend Intelligence Engine — Semantic Listening & Social RAG
 
-[![CI Quality Gate](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39533622191)
+[![CI Quality Gate](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39547726806)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
 [![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2-red)](https://docs.pydantic.dev/)
 [![LLM](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-magenta.svg)](https://deepmind.google/technologies/gemini/)
@@ -100,12 +100,12 @@ If vector matching returns empty results or encounters connection timeouts, the 
 
 To maintain absolute technical transparency regarding code quality, resilience, and evaluation rigor:
 
-* **Strict Blocking CI Quality Gate:** The GitHub Actions pipeline strictly enforces code quality with Ruff (running without `--exit-zero`), blocking violations of the configured static rules across `src/` and `tests/`. With PR #2 and PR #3 merged into `main`, the baseline remote CI run ([39533622191](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39533622191)) is 100% GREEN. Lint cannot guarantee runtime correctness or complete exception handling.
-* **Empirical Test Coverage (77% Measured):** The reviewed suite measures **77% global statement coverage** across 88 deterministic unit, behavior, and evaluation tests (including tailored HTTP timeout resilience). Coverage is rounded by pytest-cov; reproduce it with the commands below.
+* **Strict Blocking CI Quality Gate:** The GitHub Actions pipeline strictly enforces code quality with Ruff (running without `--exit-zero`), blocking violations of the configured static rules across `src/` and `tests/`. With PR #2, PR #3, and PR #4 merged into `main`, the baseline remote CI run ([39547726806](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39547726806)) is 100% GREEN. Lint cannot guarantee runtime correctness or complete exception handling.
+* **Empirical Test Coverage (80% Measured):** The reviewed suite measures **80% global statement coverage** across 100 deterministic unit, behavior, and evaluation tests (including tailored HTTP timeout resilience, analyzer bounded loops, and n8n packaging contracts). Coverage is rounded by pytest-cov; reproduce it with the commands below.
 * **Comprehensive Behavioral Testing:**
   * **Ingestion Resilience:** YouTube API batched statistics (`videos().list(id=','.join(ids), part='statistics')`), view and engagement threshold filtering, and empty candidate handling in `src/collector.py`.
   * **Comment Scraping:** Official YouTube comment extraction with graceful degradation on disabled comments and idempotent database insertion in `src/scraper.py`.
-  * **Dual-Sampling Cognitive Engine:** Edge case resilience in `src/analyzer.py` covering empty comment sets, small samples (<10 comments), large samples (>100 comments), missing transcript fallbacks, markdown delimiter removal (` ```json `), and sentiment normalization.
+  * **Dual-Sampling Cognitive Engine:** Edge case resilience in `src/analyzer.py` covering empty comment sets, small samples (<10 comments), large samples (>100 comments), missing transcript fallbacks, markdown delimiter removal (` ```json `), sentiment normalization, strict database persistence error propagation, and deterministic bounded retry loops (`max_rounds` and in-memory failed post exclusion).
   * **Enterprise Integrations:** Monday.com GraphQL item and rich-text update mutation generation, group resolution, and text sanitization in `src/export_to_monday.py`; Supabase pgvector cosine search and relational fallback in `src/telegram_oraculo.py`; connection retry with exponential backoff in `src/utils/db.py`.
 * **Offline AI Evaluation Foundation (`tests/evals/`):**
   * **Synthetic Benchmark Fixtures:** Fixed offline fixtures (`sentiment_goldens.json`, 12 samples) used for deterministic unit regression and pipeline quality tracking.

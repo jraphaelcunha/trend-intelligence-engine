@@ -167,7 +167,7 @@
     },
     {
       "parameters": {
-        "command": "\"/data/project/venv/bin/python3\" \"/data/project/src/mark_as_exported.py\" --id=\"{ $('5. Loop de Videos').item.json.analysis_id }\""
+        "command": "=\"/data/project/venv/bin/python3\" \"/data/project/scripts/ops/mark_as_exported.py\" --id=\"{{ $('5. Loop de Videos').item.json.analysis_id }}\""
       },
       "id": "mark-id",
       "name": "7. Mark DB Exported",

@@ -24,6 +24,7 @@ services:
       - n8n_data:/home/node/.n8n
       # Mount directories for live development updates relative to parent root
       - ../src:/data/project/src
+      - ../scripts:/data/project/scripts
       - ../.env:/data/project/.env
 
 volumes:

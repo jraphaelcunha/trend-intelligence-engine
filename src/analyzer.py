@@ -60,22 +60,36 @@ def get_subtopic_context(subtopic_id, active_config):
             return st.get('name', ''), st.get('analysis_angle', '')
     return '', ''
 
-def get_pending_posts(limit=10):
+def get_pending_posts(limit=10, exclude_ids=None):
     """Pega posts que ainda não têm análise de IA ou cuja análise anterior deu Inconclusivo, priorizando views."""
+    conn = None
     try:
         conn = get_connection()
         cursor = conn.cursor()
         
-        query = """
-            SELECT p.id, p.post_url, p.content_title, p.content_description, 
-                   p.views_count, p.likes_count, p.subtopic, a.id as analysis_id
-            FROM public.social_posts p
-            LEFT JOIN public.post_ai_analysis a ON p.id = a.post_id
-            WHERE a.id IS NULL OR LOWER(a.public_sentiment) LIKE '%%inconclusiv%%'
-            ORDER BY p.views_count DESC
-            LIMIT %s;
-        """
-        cursor.execute(query, (limit,))
+        if exclude_ids:
+            query = """
+                SELECT p.id, p.post_url, p.content_title, p.content_description, 
+                       p.views_count, p.likes_count, p.subtopic, a.id as analysis_id
+                FROM public.social_posts p
+                LEFT JOIN public.post_ai_analysis a ON p.id = a.post_id
+                WHERE (a.id IS NULL OR LOWER(a.public_sentiment) LIKE '%%inconclusiv%%')
+                  AND p.id != ALL(%s)
+                ORDER BY p.views_count DESC
+                LIMIT %s;
+            """
+            cursor.execute(query, (list(exclude_ids), limit))
+        else:
+            query = """
+                SELECT p.id, p.post_url, p.content_title, p.content_description, 
+                       p.views_count, p.likes_count, p.subtopic, a.id as analysis_id
+                FROM public.social_posts p
+                LEFT JOIN public.post_ai_analysis a ON p.id = a.post_id
+                WHERE a.id IS NULL OR LOWER(a.public_sentiment) LIKE '%%inconclusiv%%'
+                ORDER BY p.views_count DESC
+                LIMIT %s;
+            """
+            cursor.execute(query, (limit,))
         posts = cursor.fetchall()
         
         result = []
@@ -108,11 +122,12 @@ def get_pending_posts(limit=10):
         print(f"Erro no banco ao carregar posts: {e}")
         return []
     finally:
-        if 'conn' in locals() and conn:
+        if conn:
             conn.close()
 
-def save_analysis(post_id, analysis_json, existing_analysis_id=None):
+def save_analysis(post_id, analysis_json, existing_analysis_id=None) -> bool:
     """Salva ou atualiza a análise no banco com embeddings."""
+    conn = None
     try:
         video_narrative = analysis_json.get("video_narrative", "N/A")
         public_reaction = analysis_json.get("public_reaction", "N/A")
@@ -204,11 +219,16 @@ def save_analysis(post_id, analysis_json, existing_analysis_id=None):
             )
             cursor.execute(query, values)
             print("  ✅ Novo Dossiê e Vetores salvos no banco!")
+        return True
             
     except (psycopg2.Error, ValueError) as e:
         print(f"  ❌ Erro ao salvar análise ou embedding: {e}")
+        return False
+    except Exception as e:  # noqa: BLE001 - unexpected errors during persistence
+        print(f"  ❌ Erro inesperado ao salvar análise: {e}")
+        return False
     finally:
-        if 'conn' in locals() and conn:
+        if conn:
             conn.close()
 
 def analyze_post(post, comments, active_config):
@@ -284,26 +304,40 @@ def analyze_post(post, comments, active_config):
             
         print(f"  📊 Tom: {analysis_result.get('video_tone')} | Sentimento: {analysis_result.get('public_sentiment')} | Score: {analysis_result.get('algorithm_relevance_score')}")
         
-        save_analysis(post['id'], analysis_result, post.get("existing_analysis_id"))
+        saved = save_analysis(post['id'], analysis_result, post.get("existing_analysis_id"))
+        if not saved:
+            print(f"  ❌ Falha na persistência da análise no banco para o post {post['id']}.")
+            return False
         return True
         
     except Exception as e:  # noqa: BLE001 - LLM generation, parsing, or network failure
         print(f"  ❌ Erro ao processar IA para o post {post['id']}: {e}")
         return False
 
-def run_analysis(config_path=None):
+def run_analysis(config_path=None, max_rounds=5) -> int:
+    if isinstance(config_path, int):
+        max_rounds = config_path
+        config_path = None
+    if max_rounds is None:
+        max_rounds = 5
+
     active_config = load_config(config_path)
     active_model_name = active_config.get('analysis', {}).get('model', 'gemini-2.5-flash')
     
     print(f"{'='*60}")
     print("🧠 MÓDULO DE IA ESTRATÉGICA - ANALYZER")
     print(f"🤖 Modelo: {active_model_name}")
+    print(f"🔄 Limite Máximo de Rodadas: {max_rounds}")
     print(f"{'='*60}\n")
     
     round_count = 1
-    while True:
+    failed_post_ids: set = set()
+    total_success = 0
+    
+    while round_count <= max_rounds:
         print(f"🔄 Iniciando Rodada {round_count}...")
-        pending = get_pending_posts(limit=20)
+        pending = get_pending_posts(limit=20, exclude_ids=failed_post_ids)
+        pending = [p for p in pending if p[0]['id'] not in failed_post_ids]
         
         if not pending:
             print("✅ Todos os posts já possuem análises ricas e concluídas!")
@@ -311,20 +345,29 @@ def run_analysis(config_path=None):
             
         print(f"📋 Encontrados {len(pending)} posts pendentes ou que precisam de re-análise nesta rodada.\n")
         
-        success = 0
+        round_success = 0
         for i, (post, comments) in enumerate(pending, 1):
             print(f"[{i}/{len(pending)}] 🎬 {post['title'][:60]}...")
             print(f"  📂 Sub-tema: {post.get('subtopic', 'geral')} | 👁️ {post['views']} views | 💬 {len(comments)} comentários coletados")
             
             if analyze_post(post, comments, active_config):
-                success += 1
+                round_success += 1
+                total_success += 1
+            else:
+                failed_post_ids.add(post['id'])
+                print(f"  ⚠️ Post {post['id']} marcado como falho nesta execução (não será reprocessado nesta sessão).")
             sys.stdout.flush()
                 
-        print(f"\nRodada {round_count} concluída. Processados com sucesso: {success}/{len(pending)}")
+        print(f"\nRodada {round_count} concluída. Processados com sucesso: {round_success}/{len(pending)}")
         print(f"{'-'*60}\n")
         sys.stdout.flush()
         round_count += 1
+        if round_count > max_rounds:
+            print(f"⚠️ Limite máximo de {max_rounds} rodadas atingido. Encerrando execução.")
+            break
         time.sleep(2)
+        
+    return total_success
 
 if __name__ == "__main__":
     run_analysis()
