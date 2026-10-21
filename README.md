@@ -101,7 +101,7 @@ If vector matching returns empty results or encounters connection timeouts, the 
 To maintain absolute technical transparency regarding code quality, resilience, and evaluation rigor:
 
 * **Strict Blocking CI Quality Gate:** The GitHub Actions pipeline strictly enforces code quality with Ruff (running without `--exit-zero`), blocking violations of the configured static rules across `src/` and `tests/`. With PR #2 and PR #3 merged into `main`, the baseline remote CI run ([39533622191](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39533622191)) is 100% GREEN. Lint cannot guarantee runtime correctness or complete exception handling.
-* **Empirical Test Coverage (76% Measured):** The reviewed suite measures **76% global statement coverage** across 85 deterministic unit, behavior, and evaluation tests (including tailored HTTP timeout resilience). Coverage is rounded by pytest-cov; reproduce it with the commands below.
+* **Empirical Test Coverage (77% Measured):** The reviewed suite measures **77% global statement coverage** across 88 deterministic unit, behavior, and evaluation tests (including tailored HTTP timeout resilience). Coverage is rounded by pytest-cov; reproduce it with the commands below.
 * **Comprehensive Behavioral Testing:**
   * **Ingestion Resilience:** YouTube API batched statistics (`videos().list(id=','.join(ids), part='statistics')`), view and engagement threshold filtering, and empty candidate handling in `src/collector.py`.
   * **Comment Scraping:** Official YouTube comment extraction with graceful degradation on disabled comments and idempotent database insertion in `src/scraper.py`.

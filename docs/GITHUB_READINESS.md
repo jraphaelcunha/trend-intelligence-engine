@@ -19,7 +19,7 @@ The CI workflow uses Python 3.11; its result for the new PR must be checked sepa
 | Check | Result |
 |---|---|
 | PR #2 baseline `pytest tests/ --cov=src --cov-report=term-missing` | 80 passed, 75% rounded coverage |
-| Reliability hardening suite, same command | 85 passed, 76% coverage (722/948 statements) |
+| Reliability hardening suite, same command | 88 passed, 77% coverage (742/968 statements) |
 | `ruff check src/ tests/` | Passed |
 | `pip check` | Passed |
 | `pip-audit -r requirements.txt` | No known vulnerabilities in resolved dependencies |
@@ -45,7 +45,7 @@ The scanner's default rules missed the Dockerfile secrets. The full-history scan
 - Use `YouTubeTranscriptApi().fetch()` with snippet attributes and declare the supported
   major version. The old method did not exist in the resolved dependency. The revised
   success regression failed before the fix and passed afterward; no network was used.
-- Correct bilingual counts (82 → 80 → 85), synthetic Recall@1 (75% threshold → 100% measured),
+- Correct bilingual counts (82 → 80 → 85 → 88), synthetic Recall@1 (75% threshold → 100% measured),
   overbroad lint/adversarial guarantees and setup limitations.
 
 ## Reviewer limitations and pending decisions

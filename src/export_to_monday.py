@@ -228,7 +228,7 @@ def run_export():
                 print(f"  ❌ Erro da API do Monday ao criar item: {res_item_data['errors']}")
                 continue
                 
-            item_id = res_item_data.get("data", {}).get("create_item", {}).get("id")
+            item_id = ((res_item_data.get("data") or {}).get("create_item") or {}).get("id")
             if not item_id:
                 print("  ❌ Item ID não encontrado na resposta.")
                 continue
@@ -260,18 +260,27 @@ def run_export():
                     headers=get_monday_headers(),
                     timeout=MONDAY_HTTP_TIMEOUT
                 )
-                if resp_update.status_code != 200:
-                    print(f"  ⚠️ Erro HTTP ao postar update: {resp_update.status_code}")
-                else:
-                    res_update_data = resp_update.json()
-                    if "errors" in res_update_data:
-                        print(f"  ⚠️ Erro da API do Monday ao postar update: {res_update_data['errors']}")
-                    else:
-                        print("  ✓ Balão de atualização postado com sucesso!")
             except requests.exceptions.RequestException as e:
-                print(f"  ⚠️ Erro de rede/timeout ao postar update no Monday: {e}")
+                print(f"  ❌ Erro de rede/timeout ao postar update no Monday (Item ID: {item_id}): {e}")
+                continue
 
-            # 5. Marcar como exportado no Supabase
+            if resp_update.status_code != 200:
+                print(f"  ❌ Erro HTTP ao postar update no Monday (Item ID: {item_id}): {resp_update.status_code} - {resp_update.text}")
+                continue
+
+            res_update_data = resp_update.json()
+            if "errors" in res_update_data:
+                print(f"  ❌ Erro da API do Monday ao postar update (Item ID: {item_id}): {res_update_data['errors']}")
+                continue
+
+            update_id = ((res_update_data.get("data") or {}).get("create_update") or {}).get("id")
+            if not update_id:
+                print(f"  ❌ ID do update não retornado na resposta da Monday (Item ID: {item_id}).")
+                continue
+
+            print(f"  ✓ Balão de atualização postado com sucesso (Update ID: {update_id})!")
+
+            # 5. Marcar como exportado no Supabase SOMENTE com confirmação completa (Item + Update)
             cur.execute("UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE WHERE id = %s", (analysis_id,))
             conn.commit()
             print("  ✓ Sucesso! Post marcado como exportado no Supabase.\n")
