@@ -1,6 +1,6 @@
 import os
+
 import requests
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -37,7 +37,8 @@ mutation {
 response = requests.post(
     "https://api.monday.com/v2",
     json={"query": query},
-    headers=headers
+    headers=headers,
+    timeout=(5.0, 15.0)
 )
 
 print(f"Status Code: {response.status_code}")

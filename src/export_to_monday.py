@@ -15,6 +15,8 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 MONDAY_API_TOKEN = os.getenv('MONDAY_API_TOKEN')
 MONDAY_BOARD_ID = 18413482266
 MONDAY_URL = "https://api.monday.com/v2"
+# HTTP Timeout: (connect_timeout, read_timeout) in seconds
+MONDAY_HTTP_TIMEOUT = (5.0, 15.0)
 
 # Import helpers from fetcher
 sys.path.append(os.path.dirname(__file__))
@@ -206,7 +208,17 @@ def run_export():
                 }
             }
             
-            resp_item = requests.post(MONDAY_URL, json=payload, headers=get_monday_headers())
+            try:
+                resp_item = requests.post(
+                    MONDAY_URL, 
+                    json=payload, 
+                    headers=get_monday_headers(),
+                    timeout=MONDAY_HTTP_TIMEOUT
+                )
+            except requests.exceptions.RequestException as e:
+                print(f"  ❌ Erro de rede/timeout ao criar item no Monday: {e}")
+                continue
+
             if resp_item.status_code != 200:
                 print(f"  ❌ Erro HTTP ao criar item: {resp_item.status_code} - {resp_item.text}")
                 continue
@@ -241,15 +253,23 @@ def run_export():
                 }
             }
             
-            resp_update = requests.post(MONDAY_URL, json=payload_update, headers=get_monday_headers())
-            if resp_update.status_code != 200:
-                print(f"  ⚠️ Erro HTTP ao postar update: {resp_update.status_code}")
-            else:
-                res_update_data = resp_update.json()
-                if "errors" in res_update_data:
-                    print(f"  ⚠️ Erve da API do Monday ao postar update: {res_update_data['errors']}")
+            try:
+                resp_update = requests.post(
+                    MONDAY_URL, 
+                    json=payload_update, 
+                    headers=get_monday_headers(),
+                    timeout=MONDAY_HTTP_TIMEOUT
+                )
+                if resp_update.status_code != 200:
+                    print(f"  ⚠️ Erro HTTP ao postar update: {resp_update.status_code}")
                 else:
-                    print("  ✓ Balão de atualização postado com sucesso!")
+                    res_update_data = resp_update.json()
+                    if "errors" in res_update_data:
+                        print(f"  ⚠️ Erro da API do Monday ao postar update: {res_update_data['errors']}")
+                    else:
+                        print("  ✓ Balão de atualização postado com sucesso!")
+            except requests.exceptions.RequestException as e:
+                print(f"  ⚠️ Erro de rede/timeout ao postar update no Monday: {e}")
 
             # 5. Marcar como exportado no Supabase
             cur.execute("UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE WHERE id = %s", (analysis_id,))

@@ -21,6 +21,8 @@ load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL')
 MONDAY_API_TOKEN = os.getenv('MONDAY_API_TOKEN')
 MONDAY_URL = "https://api.monday.com/v2"
+# HTTP Timeout: (connect_timeout, read_timeout) in seconds
+MONDAY_HTTP_TIMEOUT = (5.0, 15.0)
 
 def load_config(config_path=None):
     """Carrega a configuração do arquivo YAML especificado ou do padrão do piloto."""
@@ -73,7 +75,8 @@ def get_existing_monday_groups():
         resp = requests.post(
             MONDAY_URL, 
             json={"query": query, "variables": {"boardId": [str(MONDAY_BOARD_ID)]}}, 
-            headers=get_monday_headers()
+            headers=get_monday_headers(),
+            timeout=MONDAY_HTTP_TIMEOUT
         )
         if resp.status_code == 200:
             data = resp.json()
@@ -106,7 +109,8 @@ def create_monday_group(group_title):
         resp = requests.post(
             MONDAY_URL, 
             json={"query": query, "variables": {"boardId": str(MONDAY_BOARD_ID), "groupName": group_title}}, 
-            headers=get_monday_headers()
+            headers=get_monday_headers(),
+            timeout=MONDAY_HTTP_TIMEOUT
         )
         if resp.status_code == 200:
             data = resp.json()
