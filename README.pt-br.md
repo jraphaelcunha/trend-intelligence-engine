@@ -1,5 +1,6 @@
 # 🏆 Trend Intelligence Engine — Escuta Semântica & Social RAG
 
+[![CI Quality Gate](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39533622191)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
 [![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2-red)](https://docs.pydantic.dev/)
 [![LLM](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-magenta.svg)](https://deepmind.google/technologies/gemini/)
@@ -99,8 +100,8 @@ Caso a busca vetorial não encontre resultados satisfatórios ou ocorra indispon
 
 Para garantir absoluta transparência técnica sobre a qualidade de código, resiliência e rigor metodológico:
 
-* **Quality Gate de CI Estritamente Bloqueante:** O workflow no GitHub Actions aplica verificação rigorosa com o Ruff (executado sem `--exit-zero`), bloqueando violações das regras estáticas configuradas em `src/` e `tests/`. Lint não garante correção em runtime nem tratamento completo de exceções.
-* **Cobertura de Testes Empírica (75% Medida):** A suíte revisada mede **75% de cobertura global de declarações**, com 80 testes determinísticos de unidade, comportamento e avaliação. A cobertura é arredondada pelo pytest-cov e pode ser reproduzida pelos comandos abaixo.
+* **Quality Gate de CI Estritamente Bloqueante:** O workflow no GitHub Actions aplica verificação rigorosa com o Ruff (executado sem `--exit-zero`), bloqueando violações das regras estáticas configuradas em `src/` e `tests/`. Com os PRs #2 e #3 mesclados na `main`, a execução remota de CI ([39533622191](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39533622191)) está 100% VERDE. Lint não garante correção em runtime nem tratamento completo de exceções.
+* **Cobertura de Testes Empírica (77% Medida):** A suíte revisada mede **77% de cobertura global de declarações**, com 88 testes determinísticos de unidade, comportamento e avaliação (incluindo resiliência a timeouts HTTP calibrados). A cobertura é arredondada pelo pytest-cov e pode ser reproduzida pelos comandos abaixo.
 * **Testes Abrangentes de Comportamento:**
   * **Resiliência de Ingestão:** Agregação de estatísticas em lote na API do YouTube (`videos().list(id=','.join(ids), part='statistics')`), filtros de corte por visualizações/engajamento e tratamento de listas vazias em `src/collector.py`.
   * **Raspagem de Comentários:** Extração oficial de comentários via YouTube Data API com tolerância a comentários desativados e inserção idempotente no banco em `src/scraper.py`.

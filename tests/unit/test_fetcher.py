@@ -4,8 +4,12 @@ Unit tests for fetcher and Monday.com transformation helpers.
 
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from src.fetcher import (
+    MONDAY_HTTP_TIMEOUT,
     clean_string,
+    create_monday_group,
     extract_section,
     format_pain_points_and_sentiment,
     get_existing_monday_groups,
@@ -69,3 +73,28 @@ def test_get_existing_monday_groups(mock_post, mock_monday_groups_payload, monke
     groups = get_existing_monday_groups()
     assert "tática e react de jogos" in groups
     assert groups["tática e react de jogos"] == "topics_tatica"
+
+
+@patch("src.fetcher.requests.post")
+def test_get_existing_monday_groups_timeout(mock_post, monkeypatch):
+    """Verify that get_existing_monday_groups gracefully returns empty dict on timeout."""
+    monkeypatch.setattr("src.fetcher.MONDAY_API_TOKEN", "mock_token")
+    mock_post.side_effect = requests.exceptions.Timeout("Connection timed out to Monday.com")
+
+    groups = get_existing_monday_groups()
+    assert groups == {}
+    mock_post.assert_called_once()
+    assert mock_post.call_args[1].get("timeout") == MONDAY_HTTP_TIMEOUT
+
+
+@patch("src.fetcher.requests.post")
+def test_create_monday_group_timeout(mock_post, monkeypatch):
+    """Verify that create_monday_group gracefully returns None on connection timeout."""
+    monkeypatch.setattr("src.fetcher.MONDAY_API_TOKEN", "mock_token")
+    mock_post.side_effect = requests.exceptions.ConnectTimeout("Connect timeout to Monday.com")
+
+    group_id = create_monday_group("Novo Grupo")
+    assert group_id is None
+    mock_post.assert_called_once()
+    assert mock_post.call_args[1].get("timeout") == MONDAY_HTTP_TIMEOUT
+

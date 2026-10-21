@@ -4,7 +4,9 @@ Unit tests for Monday.com export service in src/export_to_monday.py.
 
 from unittest.mock import MagicMock, patch
 
-from src.export_to_monday import get_monday_headers, run_export
+import requests
+
+from src.export_to_monday import MONDAY_HTTP_TIMEOUT, get_monday_headers, run_export
 
 
 def test_get_monday_headers(monkeypatch):
@@ -154,3 +156,227 @@ def test_run_export_dynamic_group_creation(monkeypatch):
                     mock_create_grp.assert_called_once_with("Tática e React de Jogos")
                     create_item_call = mock_http.call_args_list[0]
                     assert create_item_call[1]["json"]["variables"]["groupId"] == "new_dynamic_group_id"
+
+
+def test_run_export_create_item_timeout(monkeypatch):
+    """Verify that a timeout during item creation skips the record without updating Supabase."""
+    monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    pending_records = [
+        {
+            "post_id": 101,
+            "analysis_id": 501,
+            "subtopic": "tatica",
+            "content_title": "Vídeo Timeout",
+            "post_url": "https://youtube.com/watch?v=timeout",
+            "views_count": 1000,
+            "likes_count": 10,
+            "comments_count": 5,
+            "published_at": None,
+            "video_tone": "Neutro",
+            "editing_style": "Cortes",
+            "content_summary": "",
+            "audience_pain_points": [],
+            "public_sentiment": "Neutro",
+            "algorithm_relevance_score": 5.0,
+            "strategic_insights": "",
+        }
+    ]
+    mock_cur.fetchall.side_effect = [pending_records, []]
+    mock_conn.cursor.return_value = mock_cur
+
+    with patch("src.export_to_monday.get_existing_monday_groups", return_value={"tática e react de jogos": "grp_tatica"}):
+        with patch("psycopg2.connect", return_value=mock_conn):
+            with patch("requests.post", side_effect=requests.exceptions.Timeout("Read timed out")) as mock_http:
+                run_export()
+                mock_http.assert_called_once()
+                assert mock_http.call_args[1].get("timeout") == MONDAY_HTTP_TIMEOUT
+                # Confirm Supabase update was never executed
+                for call in mock_cur.execute.call_args_list:
+                    assert "UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE" not in call[0][0]
+                mock_conn.commit.assert_not_called()
+
+
+def test_run_export_update_timeout_does_not_mark_exported(monkeypatch):
+    """Verify that update post timeout skips marking exported_to_zapier in Supabase."""
+    monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    pending_records = [
+        {
+            "post_id": 101,
+            "analysis_id": 501,
+            "subtopic": "tatica",
+            "content_title": "Vídeo Update Timeout",
+            "post_url": "https://youtube.com/watch?v=timeout",
+            "views_count": 1000,
+            "likes_count": 10,
+            "comments_count": 5,
+            "published_at": None,
+            "video_tone": "Neutro",
+            "editing_style": "Cortes",
+            "content_summary": "",
+            "audience_pain_points": [],
+            "public_sentiment": "Neutro",
+            "algorithm_relevance_score": 5.0,
+            "strategic_insights": "",
+        }
+    ]
+    mock_cur.fetchall.side_effect = [pending_records, []]
+    mock_conn.cursor.return_value = mock_cur
+
+    resp_item = MagicMock()
+    resp_item.status_code = 200
+    resp_item.json.return_value = {"data": {"create_item": {"id": "monday_item_777"}}}
+
+    with patch("src.export_to_monday.get_existing_monday_groups", return_value={"tática e react de jogos": "grp_tatica"}):
+        with patch("psycopg2.connect", return_value=mock_conn):
+            with patch("requests.post", side_effect=[resp_item, requests.exceptions.Timeout("Update timeout")]) as mock_http:
+                run_export()
+                assert mock_http.call_count == 2
+                assert mock_http.call_args_list[0][1].get("timeout") == MONDAY_HTTP_TIMEOUT
+                assert mock_http.call_args_list[1][1].get("timeout") == MONDAY_HTTP_TIMEOUT
+                # Verify Supabase was NOT updated or committed on update timeout
+                for call in mock_cur.execute.call_args_list:
+                    assert "UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE" not in call[0][0]
+                mock_conn.commit.assert_not_called()
+
+
+def test_run_export_update_http_error_does_not_mark_exported(monkeypatch):
+    """Verify that HTTP non-200 on create_update skips marking exported_to_zapier in Supabase."""
+    monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    pending_records = [
+        {
+            "post_id": 102,
+            "analysis_id": 502,
+            "subtopic": "tatica",
+            "content_title": "Vídeo Update HTTP 500",
+            "post_url": "https://youtube.com/watch?v=err500",
+            "views_count": 1000,
+            "likes_count": 10,
+            "comments_count": 5,
+            "published_at": None,
+            "video_tone": "Neutro",
+            "editing_style": "Cortes",
+            "content_summary": "",
+            "audience_pain_points": [],
+            "public_sentiment": "Neutro",
+            "algorithm_relevance_score": 5.0,
+            "strategic_insights": "",
+        }
+    ]
+    mock_cur.fetchall.side_effect = [pending_records, []]
+    mock_conn.cursor.return_value = mock_cur
+
+    resp_item = MagicMock()
+    resp_item.status_code = 200
+    resp_item.json.return_value = {"data": {"create_item": {"id": "monday_item_778"}}}
+
+    resp_update_error = MagicMock()
+    resp_update_error.status_code = 500
+    resp_update_error.text = "Internal Server Error"
+
+    with patch("src.export_to_monday.get_existing_monday_groups", return_value={"tática e react de jogos": "grp_tatica"}):
+        with patch("psycopg2.connect", return_value=mock_conn):
+            with patch("requests.post", side_effect=[resp_item, resp_update_error]) as mock_http:
+                run_export()
+                assert mock_http.call_count == 2
+                for call in mock_cur.execute.call_args_list:
+                    assert "UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE" not in call[0][0]
+                mock_conn.commit.assert_not_called()
+
+
+def test_run_export_update_graphql_errors_does_not_mark_exported(monkeypatch):
+    """Verify that GraphQL API errors on create_update skip marking exported_to_zapier in Supabase."""
+    monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    pending_records = [
+        {
+            "post_id": 103,
+            "analysis_id": 503,
+            "subtopic": "tatica",
+            "content_title": "Vídeo Update GraphQL Error",
+            "post_url": "https://youtube.com/watch?v=errgql",
+            "views_count": 1000,
+            "likes_count": 10,
+            "comments_count": 5,
+            "published_at": None,
+            "video_tone": "Neutro",
+            "editing_style": "Cortes",
+            "content_summary": "",
+            "audience_pain_points": [],
+            "public_sentiment": "Neutro",
+            "algorithm_relevance_score": 5.0,
+            "strategic_insights": "",
+        }
+    ]
+    mock_cur.fetchall.side_effect = [pending_records, []]
+    mock_conn.cursor.return_value = mock_cur
+
+    resp_item = MagicMock()
+    resp_item.status_code = 200
+    resp_item.json.return_value = {"data": {"create_item": {"id": "monday_item_779"}}}
+
+    resp_update_gql_err = MagicMock()
+    resp_update_gql_err.status_code = 200
+    resp_update_gql_err.json.return_value = {"errors": [{"message": "Item was not found or permissions denied"}]}
+
+    with patch("src.export_to_monday.get_existing_monday_groups", return_value={"tática e react de jogos": "grp_tatica"}):
+        with patch("psycopg2.connect", return_value=mock_conn):
+            with patch("requests.post", side_effect=[resp_item, resp_update_gql_err]) as mock_http:
+                run_export()
+                assert mock_http.call_count == 2
+                for call in mock_cur.execute.call_args_list:
+                    assert "UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE" not in call[0][0]
+                mock_conn.commit.assert_not_called()
+
+
+def test_run_export_update_missing_id_does_not_mark_exported(monkeypatch):
+    """Verify that missing update ID in GraphQL response skips marking exported_to_zapier in Supabase."""
+    monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+    pending_records = [
+        {
+            "post_id": 104,
+            "analysis_id": 504,
+            "subtopic": "tatica",
+            "content_title": "Vídeo Update Missing ID",
+            "post_url": "https://youtube.com/watch?v=missid",
+            "views_count": 1000,
+            "likes_count": 10,
+            "comments_count": 5,
+            "published_at": None,
+            "video_tone": "Neutro",
+            "editing_style": "Cortes",
+            "content_summary": "",
+            "audience_pain_points": [],
+            "public_sentiment": "Neutro",
+            "algorithm_relevance_score": 5.0,
+            "strategic_insights": "",
+        }
+    ]
+    mock_cur.fetchall.side_effect = [pending_records, []]
+    mock_conn.cursor.return_value = mock_cur
+
+    resp_item = MagicMock()
+    resp_item.status_code = 200
+    resp_item.json.return_value = {"data": {"create_item": {"id": "monday_item_780"}}}
+
+    resp_update_no_id = MagicMock()
+    resp_update_no_id.status_code = 200
+    resp_update_no_id.json.return_value = {"data": {"create_update": None}}
+
+    with patch("src.export_to_monday.get_existing_monday_groups", return_value={"tática e react de jogos": "grp_tatica"}):
+        with patch("psycopg2.connect", return_value=mock_conn):
+            with patch("requests.post", side_effect=[resp_item, resp_update_no_id]) as mock_http:
+                run_export()
+                assert mock_http.call_count == 2
+                for call in mock_cur.execute.call_args_list:
+                    assert "UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE" not in call[0][0]
+                mock_conn.commit.assert_not_called()
+

@@ -1,5 +1,6 @@
 # 🏆 Trend Intelligence Engine — Semantic Listening & Social RAG
 
+[![CI Quality Gate](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39533622191)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
 [![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2-red)](https://docs.pydantic.dev/)
 [![LLM](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-magenta.svg)](https://deepmind.google/technologies/gemini/)
@@ -99,8 +100,8 @@ If vector matching returns empty results or encounters connection timeouts, the 
 
 To maintain absolute technical transparency regarding code quality, resilience, and evaluation rigor:
 
-* **Strict Blocking CI Quality Gate:** The GitHub Actions pipeline strictly enforces code quality with Ruff (running without `--exit-zero`), blocking violations of the configured static rules across `src/` and `tests/`. Lint cannot guarantee runtime correctness or complete exception handling.
-* **Empirical Test Coverage (75% Measured):** The reviewed suite measures **75% global statement coverage** across 80 deterministic unit, behavior, and evaluation tests. Coverage is rounded by pytest-cov; reproduce it with the commands below.
+* **Strict Blocking CI Quality Gate:** The GitHub Actions pipeline strictly enforces code quality with Ruff (running without `--exit-zero`), blocking violations of the configured static rules across `src/` and `tests/`. With PR #2 and PR #3 merged into `main`, the baseline remote CI run ([39533622191](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39533622191)) is 100% GREEN. Lint cannot guarantee runtime correctness or complete exception handling.
+* **Empirical Test Coverage (77% Measured):** The reviewed suite measures **77% global statement coverage** across 88 deterministic unit, behavior, and evaluation tests (including tailored HTTP timeout resilience). Coverage is rounded by pytest-cov; reproduce it with the commands below.
 * **Comprehensive Behavioral Testing:**
   * **Ingestion Resilience:** YouTube API batched statistics (`videos().list(id=','.join(ids), part='statistics')`), view and engagement threshold filtering, and empty candidate handling in `src/collector.py`.
   * **Comment Scraping:** Official YouTube comment extraction with graceful degradation on disabled comments and idempotent database insertion in `src/scraper.py`.
