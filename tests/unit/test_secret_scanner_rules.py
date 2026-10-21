@@ -6,6 +6,7 @@ The Gitleaks action still scans new commits separately; historic incidents need 
 
 import re
 from pathlib import Path
+
 import tomllib
 
 CONFIG = Path(__file__).resolve().parents[2] / "gitleaks.toml"
