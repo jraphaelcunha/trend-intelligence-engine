@@ -30,8 +30,9 @@ ENV PATH="/data/project/venv/bin:$PATH"
 COPY requirements.txt /data/project/requirements.txt
 RUN pip3 install --no-cache-dir -r /data/project/requirements.txt
 
-# Copy source code and files
+# Copy source code and operational scripts
 COPY src /data/project/src
+COPY scripts /data/project/scripts
 
 # Set correct permissions for n8n's native 'node' user
 RUN chown -R node:node /data/project
