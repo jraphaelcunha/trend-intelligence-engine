@@ -3,6 +3,7 @@ Unit tests for analyzer module, prompt construction, dual-sampling, and database
 """
 
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from src.analyzer import (
@@ -53,17 +54,17 @@ def test_get_subtopic_context():
 def test_get_transcript_success():
     """Verify transcript segments are concatenated into a single string."""
     mock_segments = [
-        {"text": "Olá a todos,", "start": 0.0, "duration": 2.0},
-        {"text": "hoje falaremos sobre a Copa 2026.", "start": 2.0, "duration": 3.0},
+        SimpleNamespace(text="Olá a todos,"),
+        SimpleNamespace(text="hoje falaremos sobre a Copa 2026."),
     ]
-    with patch("src.analyzer.YouTubeTranscriptApi.get_transcript", create=True, return_value=mock_segments):
+    with patch("src.analyzer.YouTubeTranscriptApi.fetch", return_value=mock_segments):
         transcript = get_transcript("test_vid_id")
         assert transcript == "Olá a todos, hoje falaremos sobre a Copa 2026."
 
 
 def test_get_transcript_fallback_on_error():
     """Verify fallback message when transcript API raises an exception."""
-    with patch("src.analyzer.YouTubeTranscriptApi.get_transcript", create=True, side_effect=Exception("Disabled")):
+    with patch("src.analyzer.YouTubeTranscriptApi.fetch", side_effect=Exception("Disabled")):
         transcript = get_transcript("disabled_vid")
         assert transcript == "Legenda indisponível."
 

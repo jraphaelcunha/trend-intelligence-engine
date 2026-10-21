@@ -46,8 +46,8 @@ def extract_video_id(url):
 def get_transcript(video_id):
     """Obtém a transcrição do vídeo via youtube-transcript-api."""
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['pt', 'en', 'pt-BR'])
-        full_text = " ".join([item['text'] for item in transcript_list])
+        transcript_list = YouTubeTranscriptApi().fetch(video_id, languages=['pt', 'en', 'pt-BR'])
+        full_text = " ".join([item.text for item in transcript_list])
         return full_text
     except Exception as e:  # noqa: BLE001 - youtube_transcript_api can raise various API and network exceptions
         print(f"  ⚠️ Legenda indisponível para {video_id}: {type(e).__name__}")

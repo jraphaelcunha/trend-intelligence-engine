@@ -99,8 +99,8 @@ If vector matching returns empty results or encounters connection timeouts, the 
 
 To maintain absolute technical transparency regarding code quality, resilience, and evaluation rigor:
 
-* **Strict Blocking CI Quality Gate:** The GitHub Actions pipeline strictly enforces code quality with Ruff (running without `--exit-zero`), guaranteeing zero tolerated runtime syntax defects, undefined variables, or unhandled exceptions across `src/` and `tests/`.
-* **Empirical Test Coverage (75% Measured):** The test suite has been elevated from an 18% baseline to **75% global statement coverage** across 82 deterministic unit, behavior, and evaluation tests.
+* **Strict Blocking CI Quality Gate:** The GitHub Actions pipeline strictly enforces code quality with Ruff (running without `--exit-zero`), blocking violations of the configured static rules across `src/` and `tests/`. Lint cannot guarantee runtime correctness or complete exception handling.
+* **Empirical Test Coverage (75% Measured):** The reviewed suite measures **75% global statement coverage** across 80 deterministic unit, behavior, and evaluation tests. Coverage is rounded by pytest-cov; reproduce it with the commands below.
 * **Comprehensive Behavioral Testing:**
   * **Ingestion Resilience:** YouTube API batched statistics (`videos().list(id=','.join(ids), part='statistics')`), view and engagement threshold filtering, and empty candidate handling in `src/collector.py`.
   * **Comment Scraping:** Official YouTube comment extraction with graceful degradation on disabled comments and idempotent database insertion in `src/scraper.py`.
@@ -109,12 +109,18 @@ To maintain absolute technical transparency regarding code quality, resilience, 
 * **Offline AI Evaluation Foundation (`tests/evals/`):**
   * **Synthetic Benchmark Fixtures:** Fixed offline fixtures (`sentiment_goldens.json`, 12 samples) used for deterministic unit regression and pipeline quality tracking.
   * **Heuristic Post-Processing Classification:** Evaluates offline sentiment normalization mapping (`map_sentiment`) across "Positivo", "Negativo", and "Neutro" classes on the 12 fixture cases (Accuracy: 1.000, Macro-F1: 1.000). *Note: This evaluates deterministic output normalization and parsing logic, not open-domain production Gemini LLM classification accuracy.*
-  * **Algorithmic Retrieval Ranking Unit Tests:** Evaluates local cosine ranking calculation (`rank_documents`) on synthetic 4-dimensional directional vectors across 4 test queries (Recall@1: 75%, Recall@3: 100%, MRR: 1.000). *Note: This validates ranking mathematics and fallback mechanics, not empirical retrieval quality across a live multi-million document pgvector corpus.*
-  * **Adversarial & Untrusted Content Handling:** Systematic unit tests verifying that local defenses—Pydantic data contract rejection, string truncation, defensive SQL parameterization, and non-JSON/unauthorized literal coercion—prevent uncaught exceptions and database corruption. *Note: These tests validate local pipeline error handling and input contracts, not total theoretical immunity against all classes of LLM prompt injections or jailbreaks in production.*
+  * **Algorithmic Retrieval Ranking Unit Tests:** Evaluates local cosine ranking calculation (`rank_documents`) on synthetic 4-dimensional directional vectors across 4 test queries (Recall@1: 100%, Recall@3: 100%, MRR: 1.000). *Note: This validates ranking mathematics and fallback mechanics, not empirical retrieval quality across a live multi-million document pgvector corpus.*
+  * **Adversarial & Untrusted Content Handling:** Systematic unit tests verifying that local defenses—Pydantic data contract rejection, string truncation, defensive SQL parameterization, and non-JSON/unauthorized literal coercion—exercise the specific fixture cases. They do not prove absence of uncaught exceptions or database corruption. *Note: These tests validate local pipeline error handling and input contracts, not total theoretical immunity against all classes of LLM prompt injections or jailbreaks in production.*
 
 ---
 
 ## 🚀 6. Local Setup & Quickstart
+
+**Start with offline tests:** no service credentials are needed for the test suite. Live CLI commands below call external services and may consume API quota. Database tables and the `match_post_analysis` function must already exist; this repository does not include bootstrap migrations.
+
+**Deployment hold:** review [security operations](docs/SECURITY_OPERATIONS.md) before running containers or deploying. Provide the existing n8n key and database password externally after backup; do not generate a replacement key for an existing installation. Docker Compose uses remote PostgreSQL, not a bundled local database.
+
+**Embedding limitation:** 768d is the documented database target. The code does not explicitly request that dimension, so model output/schema compatibility has not been established by the offline tests.
 
 ### Prerequisites
 * Python 3.11+
@@ -173,7 +179,7 @@ pytest tests/evals/ -v
 
 ### Running with Docker Compose
 ```bash
-docker compose -f docker/docker-compose.yml up --build -d
+docker compose --env-file .env -f docker/docker-compose.yml up --build -d
 ```
 The n8n orchestrator console will be available at [http://localhost:5678](http://localhost:5678).
 

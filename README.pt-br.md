@@ -99,8 +99,8 @@ Caso a busca vetorial não encontre resultados satisfatórios ou ocorra indispon
 
 Para garantir absoluta transparência técnica sobre a qualidade de código, resiliência e rigor metodológico:
 
-* **Quality Gate de CI Estritamente Bloqueante:** O workflow no GitHub Actions aplica verificação rigorosa com o Ruff (executado sem `--exit-zero`), assegurando tolerância zero a defeitos de sintaxe em runtime, variáveis indefinidas ou exceções não tratadas em `src/` e `tests/`.
-* **Cobertura de Testes Empírica (75% Medida):** A suíte de testes foi elevada de um baseline de 18% para **75% de cobertura global de declarações**, com 82 testes determinísticos de unidade, comportamento e avaliação.
+* **Quality Gate de CI Estritamente Bloqueante:** O workflow no GitHub Actions aplica verificação rigorosa com o Ruff (executado sem `--exit-zero`), bloqueando violações das regras estáticas configuradas em `src/` e `tests/`. Lint não garante correção em runtime nem tratamento completo de exceções.
+* **Cobertura de Testes Empírica (75% Medida):** A suíte revisada mede **75% de cobertura global de declarações**, com 80 testes determinísticos de unidade, comportamento e avaliação. A cobertura é arredondada pelo pytest-cov e pode ser reproduzida pelos comandos abaixo.
 * **Testes Abrangentes de Comportamento:**
   * **Resiliência de Ingestão:** Agregação de estatísticas em lote na API do YouTube (`videos().list(id=','.join(ids), part='statistics')`), filtros de corte por visualizações/engajamento e tratamento de listas vazias em `src/collector.py`.
   * **Raspagem de Comentários:** Extração oficial de comentários via YouTube Data API com tolerância a comentários desativados e inserção idempotente no banco em `src/scraper.py`.
@@ -109,12 +109,19 @@ Para garantir absoluta transparência técnica sobre a qualidade de código, res
 * **Fundação de Avaliação de IA Offline (`tests/evals/`):**
   * **Fixtures de Benchmark Sintético:** Fixtures offline controladas (`sentiment_goldens.json`, 12 amostras) utilizadas para testes determinísticos de regressão e aferição de pipelines.
   * **Pós-Processamento e Normalização de Sentimento:** Avalia o mapeamento determinístico de normalização de sentimentos (`map_sentiment`) nas classes "Positivo", "Negativo" e "Neutro" sobre as 12 amostras do benchmark (Acurácia: 1.000, Macro-F1: 1.000). *Nota: Mede a lógica determinística de pós-processamento e coerção de schema, não a acurácia do modelo Gemini em produção aberta.*
-  * **Testes Algorítmicos de Ranking de Recuperação:** Avalia a função de cálculo de ranking por cosseno (`rank_documents`) em vetores sintéticos direcionais de 4 dimensões para 4 consultas de teste (Recall@1: 75%, Recall@3: 100%, MRR: 1.000). *Nota: Valida a matemática de ranking e a lógica de fallback, não a qualidade empírica de recuperação sobre um corpus massivo em produção no pgvector.*
-  * **Tratamento de Conteúdo Adversarial e Não Confiável:** Testes unitários sistemáticos comprovando que defesas locais — rejeição por contratos Pydantic v2, truncamento de strings, parametrização segura no SQL e coerção defensiva de respostas não-JSON ou literais inválidos — evitam exceções não tratadas e corrupção de dados. *Nota: Comprovam resiliência de parsing e validação de entrada no pipeline local, não imunidade absoluta a ataques sofisticados de jailbreak de LLMs em produção.*
+  * **Testes Algorítmicos de Ranking de Recuperação:** Avalia a função de cálculo de ranking por cosseno (`rank_documents`) em vetores sintéticos direcionais de 4 dimensões para 4 consultas de teste (Recall@1: 100%, Recall@3: 100%, MRR: 1.000). *Nota: Valida a matemática de ranking e a lógica de fallback, não a qualidade empírica de recuperação sobre um corpus massivo em produção no pgvector.*
+  * **Tratamento de Conteúdo Adversarial e Não Confiável:** Testes unitários sistemáticos comprovando que defesas locais — rejeição por contratos Pydantic v2, truncamento de strings, parametrização segura no SQL e coerção defensiva de respostas não-JSON ou literais inválidos — exercitam os casos específicos das fixtures. Não comprovam ausência de exceções não tratadas ou corrupção de dados. *Nota: Comprovam resiliência de parsing e validação de entrada no pipeline local, não imunidade absoluta a ataques sofisticados de jailbreak de LLMs em produção.*
 
 ---
 
 ## 🚀 6. Como Executar Localmente
+
+
+**Comece pelos testes offline:** a suíte não precisa de credenciais. Os comandos CLI abaixo acessam serviços externos e podem consumir cotas. As tabelas e a função `match_post_analysis` devem existir previamente; o repositório não inclui migrações de inicialização.
+
+**Deploy pendente:** consulte [operações de segurança](docs/SECURITY_OPERATIONS.md) antes de executar containers ou fazer deploy. Injete a chave existente do n8n e a senha do banco externamente após backup; não gere outra chave para uma instalação existente. O Compose usa PostgreSQL remoto, sem banco local incluído.
+
+**Limitação dos embeddings:** 768d é a dimensão documentada do banco. O código não solicita explicitamente essa dimensão; a compatibilidade entre saída do modelo e schema não foi comprovada pelos testes offline.
 
 ### Pré-requisitos
 * Python 3.11+
@@ -173,7 +180,7 @@ pytest tests/evals/ -v
 
 ### Executando com Docker Compose
 ```bash
-docker compose -f docker/docker-compose.yml up --build -d
+docker compose --env-file .env -f docker/docker-compose.yml up --build -d
 ```
 A interface do n8n estará acessível em [http://localhost:5678](http://localhost:5678).
 

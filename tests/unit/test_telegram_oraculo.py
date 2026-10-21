@@ -3,14 +3,7 @@ Unit tests for Telegram RAG Oráculo service in src/telegram_oraculo.py.
 """
 
 import asyncio
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
-
-if "telegram" not in sys.modules:
-    mock_telegram = MagicMock()
-    mock_telegram_ext = MagicMock()
-    sys.modules["telegram"] = mock_telegram
-    sys.modules["telegram.ext"] = mock_telegram_ext
 
 import psycopg2
 

@@ -47,8 +47,8 @@ USER node
 EXPOSE 8080
 ENV N8N_PORT=8080
 
-# CRITICAL FIX 1: Fixed encryption key so credentials/settings survive container restarts.
-ENV N8N_ENCRYPTION_KEY=43a99c146d1a4374a4ac9960daef9ac7
+# Supply N8N_ENCRYPTION_KEY and DB_POSTGRESDB_PASSWORD at runtime.
+# Existing installations must preserve their current key; see docs/SECURITY_OPERATIONS.md.
 
 # CRITICAL FIX 2: Tell n8n it's behind a reverse proxy (Cloud Run).
 ENV N8N_PROXY_HOPS=1
@@ -59,7 +59,6 @@ ENV DB_POSTGRESDB_HOST=db.nfjpvmpoxwolpiyqejph.supabase.co
 ENV DB_POSTGRESDB_PORT=5432
 ENV DB_POSTGRESDB_DATABASE=postgres
 ENV DB_POSTGRESDB_USER=postgres
-ENV DB_POSTGRESDB_PASSWORD=Bz*AsH.h2gkG6n8
 ENV DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED=false
 
 # Disable settings file permission checks (Cloud Run serverless)
