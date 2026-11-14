@@ -1,6 +1,7 @@
 # 🏆 Trend Intelligence Engine — Semantic Listening & Social RAG
 
 [![CI Quality Gate](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jraphaelcunha/trend-intelligence-engine/actions/runs/39547726806)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python)](https://www.python.org/)
 [![Contracts](https://img.shields.io/badge/Contracts-Pydantic%20v2-red)](https://docs.pydantic.dev/)
 [![LLM](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-magenta.svg)](https://deepmind.google/technologies/gemini/)
@@ -13,6 +14,14 @@
 > **[ 🇧🇷 Ler em Português ](README.pt-br.md)**
 
 > **Executive Overview:** The **Trend Intelligence Engine** is a professional social listening, market intelligence, and semantic analysis platform developed starting in early 2026. Designed to extract high-conviction audience signals, emerging sentiment shifts, and commercial objections from digital video ecosystems, the system operates on a **Software "Dark Kitchen"** architecture: heavy data ingestion, quota-optimized API batching, comment mining, and LLM-driven cognitive synthesis run as a **synchronous, staged execution pipeline** in Python CLI services in the backstage (with asynchronous distributed queues on the architectural roadmap). Enriched intelligence is delivered directly to decision-makers via enterprise Work OS boards (**Monday.com** with rich HTML update dossiers), workflow automations (**n8n** webhooks), and interactive conversational search (**Telegram Oráculo** with pgvector RAG).
+
+---
+
+## Intellectual Property & Data Sanitization Governance
+
+> [!NOTE]
+> **Sanitized Reference Architecture (NDA Compliant):**
+> This public repository hosts the core reference architecture and test suite. Production client dossiers, live credentials, and private tenant configurations remain externalized under strict operational controls. Review [docs/SECURITY_OPERATIONS.md](docs/SECURITY_OPERATIONS.md) prior to any production deployment.
 
 ---
 
@@ -251,3 +260,9 @@ trend-intelligence-engine/
 **João Raphael Cunha**<br/>
 Solutions Architect & AI Engineer<br/>
 [GitHub Profile](https://github.com/jraphaelcunha) | [LinkedIn](https://www.linkedin.com/in/joaoraphaelcunha/)
+
+---
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
