@@ -11,6 +11,7 @@ from src.telegram_oraculo import (
     generate_rag_answer,
     get_query_embedding,
     handle_message,
+    is_authorized_user,
     search_supabase_fallback,
     search_supabase_vector,
     start,
@@ -114,9 +115,11 @@ def test_generate_rag_answer_with_records():
         assert "Preço alto dos ingressos" in prompt_sent
 
 
-def test_telegram_start_command():
+def test_telegram_start_command(monkeypatch):
     """Verify /start command sends welcome message."""
+    monkeypatch.setenv("ALLOWED_TELEGRAM_USER_IDS", "12345")
     mock_update = MagicMock()
+    mock_update.effective_user.id = 12345
     mock_update.message.reply_text = AsyncMock()
     mock_context = MagicMock()
 
@@ -125,9 +128,11 @@ def test_telegram_start_command():
     assert "Oráculo do Trend Intelligence Engine" in mock_update.message.reply_text.call_args[0][0]
 
 
-def test_telegram_handle_message_with_fallback():
+def test_telegram_handle_message_with_fallback(monkeypatch):
     """Verify handle_message triggers relational fallback when vector search returns 0 results."""
+    monkeypatch.setenv("ALLOWED_TELEGRAM_USER_IDS", "12345")
     mock_update = MagicMock()
+    mock_update.effective_user.id = 12345
     mock_update.message.text = "Quais as principais polêmicas?"
     mock_thinking = MagicMock()
     mock_thinking.edit_text = AsyncMock()
@@ -144,3 +149,43 @@ def test_telegram_handle_message_with_fallback():
                     mock_fallback.assert_called_once()
                     mock_rag.assert_called_once_with("Quais as principais polêmicas?", fallback_records)
                     mock_thinking.edit_text.assert_awaited_once_with("Resposta gerada")
+
+
+def test_is_authorized_user_fail_closed_and_allowlist(monkeypatch):
+    """Verify Telegram authorization fails closed unless user is allowlisted or public opt-in set."""
+    monkeypatch.delenv("ALLOWED_TELEGRAM_USER_IDS", raising=False)
+    monkeypatch.delenv("ALLOW_PUBLIC_BOT", raising=False)
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = 123456
+    assert is_authorized_user(mock_update) is False
+
+    monkeypatch.setenv("ALLOWED_TELEGRAM_USER_IDS", "111, 123456, 789")
+    assert is_authorized_user(mock_update) is True
+
+    mock_update.effective_user.id = 999999
+    assert is_authorized_user(mock_update) is False
+
+    monkeypatch.setenv("ALLOW_PUBLIC_BOT", "true")
+    assert is_authorized_user(mock_update) is True
+
+
+def test_unauthorized_user_blocked_on_start_and_message(monkeypatch):
+    """Unauthorized Telegram users must be rejected before running RAG embeddings or queries."""
+    monkeypatch.delenv("ALLOW_PUBLIC_BOT", raising=False)
+    monkeypatch.setenv("ALLOWED_TELEGRAM_USER_IDS", "111")
+
+    mock_update = MagicMock()
+    mock_update.effective_user.id = 999
+    mock_update.message.text = "Me dê os insights privados"
+    mock_update.message.reply_text = AsyncMock()
+    mock_context = MagicMock()
+
+    asyncio.run(start(mock_update, mock_context))
+    assert "Acesso restrito" in mock_update.message.reply_text.call_args[0][0]
+
+    mock_update.message.reply_text.reset_mock()
+    with patch("src.telegram_oraculo.get_query_embedding") as mock_emb:
+        asyncio.run(handle_message(mock_update, mock_context))
+        mock_emb.assert_not_called()
+        assert "Acesso restrito" in mock_update.message.reply_text.call_args[0][0]

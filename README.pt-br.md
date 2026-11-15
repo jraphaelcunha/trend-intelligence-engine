@@ -141,7 +141,8 @@ Para garantir absoluta transparência técnica sobre a qualidade de código, res
   * Google Gemini API (`GEMINI_API_KEY`)
   * String de conexão PostgreSQL do Supabase (`DATABASE_URL`)
   * Token da API Monday.com (`MONDAY_API_TOKEN`)
-  * Token de Bot do Telegram (`TELEGRAM_BOT_TOKEN`, opcional para o Oráculo)
+  * ID do Quadro alvo no Monday.com (`MONDAY_BOARD_ID`, sobrescrita opcional para exportador e fluxo n8n)
+  * Token de Bot do Telegram (`TELEGRAM_BOT_TOKEN`, opcional para o Oráculo; exige allowlist fail-closed `ALLOWED_TELEGRAM_USER_IDS`, salvo quando `ALLOW_PUBLIC_BOT=true`)
 
 ### Instalação
 ```bash

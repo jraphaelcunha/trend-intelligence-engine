@@ -38,8 +38,9 @@ an owner verifies revocation. A clean scan of only a PR diff is not a clean hist
    application authentication and network exposure separately; no live access was tested.
 - n8n command execution and environment access remain enabled for existing workflows.
    Restrict editor access and do not run untrusted workflows.
-- Telegram has no user/chat allowlist in the current implementation. Do not expose the
-   bot to untrusted users with sensitive dossiers or unrestricted billable API access.
+- Telegram Oráculo enforces a fail-closed user ID allowlist via `ALLOWED_TELEGRAM_USER_IDS`
+  (comma-separated Telegram user IDs) unless `ALLOW_PUBLIC_BOT=true` is explicitly configured;
+  unauthorized callers are rejected before triggering embeddings, database queries, or Gemini calls.
 - HTTP calls previously flagged by Bandit (B113) have been remediated with tailored connect/read timeouts across fetcher, exporters, and ops scripts, validated by explicit timeout tests.
 - n8n Workflow Blueprint Consistency & Container Packaging:
   `n8n/workflow_trend_engine.json` is a versioned blueprint artifact representing the

@@ -13,7 +13,18 @@ load_dotenv()
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 MONDAY_API_TOKEN = os.getenv('MONDAY_API_TOKEN')
-MONDAY_BOARD_ID = 18413482266
+DEFAULT_MONDAY_BOARD_ID = 18413482266
+
+
+def _resolve_board_id(fallback: int = DEFAULT_MONDAY_BOARD_ID) -> int:
+    """Resolve MONDAY_BOARD_ID from environment with a typed integer fallback."""
+    raw = (os.getenv("MONDAY_BOARD_ID") or "").strip()
+    if raw.isdigit():
+        return int(raw)
+    return fallback
+
+
+MONDAY_BOARD_ID = _resolve_board_id()
 MONDAY_URL = "https://api.monday.com/v2"
 # HTTP Timeout: (connect_timeout, read_timeout) in seconds
 MONDAY_HTTP_TIMEOUT = (5.0, 15.0)
@@ -38,6 +49,63 @@ def get_monday_headers():
         "Content-Type": "application/json",
         "API-Version": "2023-10"
     }
+
+
+def find_existing_monday_item(analysis_id: int | str) -> str | None:
+    """Look up an existing Monday.com item by Supabase analysis_id for idempotent exports."""
+    if not MONDAY_API_TOKEN:
+        return None
+
+    lookup_query = """
+    query ($boardId: ID!, $columnValue: String!) {
+      items_page_by_column_values(
+        limit: 1,
+        board_id: $boardId,
+        columns: [{column_id: "text_mm3da7sc", column_values: [$columnValue]}]
+      ) {
+        items {
+          id
+        }
+      }
+    }
+    """
+    payload = {
+        "query": lookup_query,
+        "variables": {
+            "boardId": str(_resolve_board_id(MONDAY_BOARD_ID)),
+            "columnValue": str(analysis_id),
+        },
+    }
+    try:
+        resp = requests.post(
+            MONDAY_URL,
+            json=payload,
+            headers=get_monday_headers(),
+            timeout=MONDAY_HTTP_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as e:
+        print(f"  ⚠️ Falha de rede ao verificar idempotência no Monday (analysis_id={analysis_id}): {e}")
+        return None
+
+    if resp.status_code != 200:
+        print(f"  ⚠️ Erro HTTP ao verificar idempotência no Monday: {resp.status_code}")
+        return None
+
+    try:
+        data = resp.json()
+    except ValueError:
+        print("  ⚠️ Resposta JSON inválida na consulta de idempotência do Monday.")
+        return None
+
+    if "errors" in data:
+        print(f"  ⚠️ Erro GraphQL ao verificar idempotência no Monday: {data['errors']}")
+        return None
+
+    items = ((data.get("data") or {}).get("items_page_by_column_values") or {}).get("items") or []
+    if items:
+        return items[0].get("id")
+    return None
+
 
 def run_export():
     print("="*60)
@@ -188,52 +256,59 @@ def run_export():
                 "link_mm3drm8q": {"url": clean_url, "text": "Assistir no YouTube"}
             }
 
-            # 3. Criar Item na Monday
-            print("  ➕ Criando item na planilha do Monday...")
-            create_item_query = """
-            mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
-              create_item (board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues, create_labels_if_missing: true) {
-                id
-              }
-            }
-            """
-            
-            payload = {
-                "query": create_item_query,
-                "variables": {
-                    "boardId": str(MONDAY_BOARD_ID),
-                    "groupId": resolved_group_id,
-                    "itemName": clean_title,
-                    "columnValues": json.dumps(monday_cols)
-                }
-            }
-            
-            try:
-                resp_item = requests.post(
-                    MONDAY_URL, 
-                    json=payload, 
-                    headers=get_monday_headers(),
-                    timeout=MONDAY_HTTP_TIMEOUT
+            # 3. Verificar idempotência ou criar Item na Monday
+            item_id = find_existing_monday_item(analysis_id)
+            if item_id:
+                print(
+                    f"  ♻️ Item já existente no Monday para analysis_id={analysis_id} "
+                    f"(ID: {item_id}); reutilizando sem duplicar."
                 )
-            except requests.exceptions.RequestException as e:
-                print(f"  ❌ Erro de rede/timeout ao criar item no Monday: {e}")
-                continue
-
-            if resp_item.status_code != 200:
-                print(f"  ❌ Erro HTTP ao criar item: {resp_item.status_code} - {resp_item.text}")
-                continue
+            else:
+                print("  ➕ Criando item na planilha do Monday...")
+                create_item_query = """
+                mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
+                  create_item (board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues, create_labels_if_missing: true) {
+                    id
+                  }
+                }
+                """
                 
-            res_item_data = resp_item.json()
-            if "errors" in res_item_data:
-                print(f"  ❌ Erro da API do Monday ao criar item: {res_item_data['errors']}")
-                continue
+                payload = {
+                    "query": create_item_query,
+                    "variables": {
+                        "boardId": str(_resolve_board_id(MONDAY_BOARD_ID)),
+                        "groupId": resolved_group_id,
+                        "itemName": clean_title,
+                        "columnValues": json.dumps(monday_cols)
+                    }
+                }
                 
-            item_id = ((res_item_data.get("data") or {}).get("create_item") or {}).get("id")
-            if not item_id:
-                print("  ❌ Item ID não encontrado na resposta.")
-                continue
+                try:
+                    resp_item = requests.post(
+                        MONDAY_URL, 
+                        json=payload, 
+                        headers=get_monday_headers(),
+                        timeout=MONDAY_HTTP_TIMEOUT
+                    )
+                except requests.exceptions.RequestException as e:
+                    print(f"  ❌ Erro de rede/timeout ao criar item no Monday: {e}")
+                    continue
 
-            print(f"  ✓ Item criado com sucesso (ID: {item_id})!")
+                if resp_item.status_code != 200:
+                    print(f"  ❌ Erro HTTP ao criar item: {resp_item.status_code} - {resp_item.text}")
+                    continue
+                    
+                res_item_data = resp_item.json()
+                if "errors" in res_item_data:
+                    print(f"  ❌ Erro da API do Monday ao criar item: {res_item_data['errors']}")
+                    continue
+                    
+                item_id = ((res_item_data.get("data") or {}).get("create_item") or {}).get("id")
+                if not item_id:
+                    print("  ❌ Item ID não encontrado na resposta.")
+                    continue
+
+                print(f"  ✓ Item criado com sucesso (ID: {item_id})!")
 
             # 4. Criar Update na Monday (rich-text)
             print("  💬 Postando análise comparativa e top comentários no balão do item...")

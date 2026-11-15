@@ -133,8 +133,54 @@ RESPOSTA ESTRATÉGICA:"""
     return response.text
 
 
+UNAUTHORIZED_MESSAGE = "⛔ Acesso restrito. Seu ID de usuário não está autorizado a consultar o Oráculo."
+
+
+def _parse_allowed_user_ids() -> set[int]:
+    """Parse ALLOWED_TELEGRAM_USER_IDS comma-separated integer IDs."""
+    raw = os.getenv("ALLOWED_TELEGRAM_USER_IDS", "")
+    allowed: set[int] = set()
+    for token in raw.split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            allowed.add(int(cleaned))
+        except ValueError:
+            logger.warning(f"ID inválido ignorado em ALLOWED_TELEGRAM_USER_IDS: {cleaned!r}")
+    return allowed
+
+
+def is_authorized_user(update: Update) -> bool:
+    """Fail-closed authorization guard for Telegram Oráculo handlers.
+
+    Requires the caller's numeric Telegram user ID to be present in
+    ``ALLOWED_TELEGRAM_USER_IDS``, unless ``ALLOW_PUBLIC_BOT=true`` is
+    explicitly enabled.
+    """
+    if os.getenv("ALLOW_PUBLIC_BOT", "").strip().lower() == "true":
+        return True
+    allowed_ids = _parse_allowed_user_ids()
+    user = getattr(update, "effective_user", None)
+    user_id = getattr(user, "id", None)
+    return isinstance(user_id, int) and not isinstance(user_id, bool) and user_id in allowed_ids
+
+
+async def _ensure_authorized(update: Update, entrypoint: str) -> bool:
+    """Reject unauthorized callers before invoking embeddings, DB, or LLM."""
+    if is_authorized_user(update):
+        return True
+    user = getattr(update, "effective_user", None)
+    logger.warning(f"Acesso não autorizado bloqueado em {entrypoint} (user_id={getattr(user, 'id', None)})")
+    if getattr(update, "message", None):
+        await update.message.reply_text(UNAUTHORIZED_MESSAGE)
+    return False
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando /start."""
+    if not await _ensure_authorized(update, "/start"):
+        return
     welcome = (
         "🤖 *Oráculo do Trend Intelligence Engine*\n\n"
         "Eu tenho acesso em tempo real a todos os dossiês de vídeos, "
@@ -150,6 +196,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Processa as mensagens de texto do usuário (O coração do RAG)."""
+    if not await _ensure_authorized(update, "handle_message"):
+        return
     user_query = update.message.text
     logger.info(f">>> Pergunta recebida: {user_query}")
 

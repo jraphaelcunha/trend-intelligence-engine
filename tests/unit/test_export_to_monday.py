@@ -6,7 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from src.export_to_monday import MONDAY_HTTP_TIMEOUT, get_monday_headers, run_export
+from src.export_to_monday import (
+    MONDAY_HTTP_TIMEOUT,
+    find_existing_monday_item,
+    get_monday_headers,
+    run_export,
+)
 
 
 def test_get_monday_headers(monkeypatch):
@@ -45,6 +50,7 @@ def test_run_export_no_pending_records(monkeypatch):
 def test_run_export_successful_item_and_update_creation(monkeypatch):
     """Verify item creation, rich-text update, and Supabase status marking."""
     monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    monkeypatch.setattr("src.export_to_monday.find_existing_monday_item", lambda *_args, **_kwargs: None)
     mock_conn = MagicMock()
     mock_cur = MagicMock()
 
@@ -113,6 +119,7 @@ def test_run_export_successful_item_and_update_creation(monkeypatch):
 def test_run_export_dynamic_group_creation(monkeypatch):
     """Verify group is created dynamically when not found in existing groups."""
     monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    monkeypatch.setattr("src.export_to_monday.find_existing_monday_item", lambda *_args, **_kwargs: None)
     mock_conn = MagicMock()
     mock_cur = MagicMock()
 
@@ -161,6 +168,7 @@ def test_run_export_dynamic_group_creation(monkeypatch):
 def test_run_export_create_item_timeout(monkeypatch):
     """Verify that a timeout during item creation skips the record without updating Supabase."""
     monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    monkeypatch.setattr("src.export_to_monday.find_existing_monday_item", lambda *_args, **_kwargs: None)
     mock_conn = MagicMock()
     mock_cur = MagicMock()
     pending_records = [
@@ -201,6 +209,7 @@ def test_run_export_create_item_timeout(monkeypatch):
 def test_run_export_update_timeout_does_not_mark_exported(monkeypatch):
     """Verify that update post timeout skips marking exported_to_zapier in Supabase."""
     monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    monkeypatch.setattr("src.export_to_monday.find_existing_monday_item", lambda *_args, **_kwargs: None)
     mock_conn = MagicMock()
     mock_cur = MagicMock()
     pending_records = [
@@ -246,6 +255,7 @@ def test_run_export_update_timeout_does_not_mark_exported(monkeypatch):
 def test_run_export_update_http_error_does_not_mark_exported(monkeypatch):
     """Verify that HTTP non-200 on create_update skips marking exported_to_zapier in Supabase."""
     monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    monkeypatch.setattr("src.export_to_monday.find_existing_monday_item", lambda *_args, **_kwargs: None)
     mock_conn = MagicMock()
     mock_cur = MagicMock()
     pending_records = [
@@ -292,6 +302,7 @@ def test_run_export_update_http_error_does_not_mark_exported(monkeypatch):
 def test_run_export_update_graphql_errors_does_not_mark_exported(monkeypatch):
     """Verify that GraphQL API errors on create_update skip marking exported_to_zapier in Supabase."""
     monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    monkeypatch.setattr("src.export_to_monday.find_existing_monday_item", lambda *_args, **_kwargs: None)
     mock_conn = MagicMock()
     mock_cur = MagicMock()
     pending_records = [
@@ -338,6 +349,7 @@ def test_run_export_update_graphql_errors_does_not_mark_exported(monkeypatch):
 def test_run_export_update_missing_id_does_not_mark_exported(monkeypatch):
     """Verify that missing update ID in GraphQL response skips marking exported_to_zapier in Supabase."""
     monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    monkeypatch.setattr("src.export_to_monday.find_existing_monday_item", lambda *_args, **_kwargs: None)
     mock_conn = MagicMock()
     mock_cur = MagicMock()
     pending_records = [
@@ -379,4 +391,91 @@ def test_run_export_update_missing_id_does_not_mark_exported(monkeypatch):
                 for call in mock_cur.execute.call_args_list:
                     assert "UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE" not in call[0][0]
                 mock_conn.commit.assert_not_called()
+
+
+def test_find_existing_monday_item_returns_id(monkeypatch):
+    """Verify idempotency lookup finds an already-exported Monday item by analysis_id."""
+    monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+
+    resp_hit = MagicMock()
+    resp_hit.status_code = 200
+    resp_hit.json.return_value = {
+        "data": {"items_page_by_column_values": {"items": [{"id": "existing_item_501"}]}}
+    }
+
+    resp_miss = MagicMock()
+    resp_miss.status_code = 200
+    resp_miss.json.return_value = {
+        "data": {"items_page_by_column_values": {"items": []}}
+    }
+
+    with patch("requests.post", side_effect=[resp_hit, resp_miss]) as mock_http:
+        assert find_existing_monday_item(501) == "existing_item_501"
+        assert find_existing_monday_item(502) is None
+
+        first_payload = mock_http.call_args_list[0][1]["json"]
+        assert "items_page_by_column_values" in first_payload["query"]
+        assert first_payload["variables"]["columnValue"] == "501"
+
+
+def test_run_export_reuses_existing_item_without_duplicate_create_item(monkeypatch):
+    """Verify run_export reuses an existing Monday item for analysis_id instead of creating a duplicate."""
+    monkeypatch.setattr("src.export_to_monday.MONDAY_API_TOKEN", "valid_token")
+    mock_conn = MagicMock()
+    mock_cur = MagicMock()
+
+    pending_records = [
+        {
+            "post_id": 105,
+            "analysis_id": 505,
+            "subtopic": "tatica",
+            "content_title": "Vídeo Já Exportado Antes",
+            "post_url": "https://youtube.com/watch?v=idem",
+            "views_count": 5000,
+            "likes_count": 200,
+            "comments_count": 20,
+            "published_at": None,
+            "video_tone": "Técnico",
+            "editing_style": "Cortes",
+            "content_summary": "Resumo",
+            "audience_pain_points": [],
+            "public_sentiment": "Positivo",
+            "algorithm_relevance_score": 8.0,
+            "strategic_insights": "Insight",
+        }
+    ]
+    mock_cur.fetchall.side_effect = [pending_records, []]
+    mock_conn.cursor.return_value = mock_cur
+
+    resp_lookup_hit = MagicMock()
+    resp_lookup_hit.status_code = 200
+    resp_lookup_hit.json.return_value = {
+        "data": {"items_page_by_column_values": {"items": [{"id": "existing_monday_505"}]}}
+    }
+
+    resp_create_update = MagicMock()
+    resp_create_update.status_code = 200
+    resp_create_update.json.return_value = {
+        "data": {"create_update": {"id": "monday_update_505"}}
+    }
+
+    with patch("src.export_to_monday.get_existing_monday_groups", return_value={"tática e react de jogos": "grp_tatica"}):
+        with patch("psycopg2.connect", return_value=mock_conn):
+            with patch("requests.post", side_effect=[resp_lookup_hit, resp_create_update]) as mock_http:
+                run_export()
+
+                assert mock_http.call_count == 2
+                lookup_query = mock_http.call_args_list[0][1]["json"]["query"]
+                assert "items_page_by_column_values" in lookup_query
+                update_call = mock_http.call_args_list[1][1]["json"]
+                assert "create_update" in update_call["query"]
+                assert update_call["variables"]["itemId"] == "existing_monday_505"
+                for call_item in mock_http.call_args_list:
+                    assert "create_item" not in call_item[1]["json"]["query"]
+
+                mock_cur.execute.assert_any_call(
+                    "UPDATE public.post_ai_analysis SET exported_to_zapier = TRUE WHERE id = %s",
+                    (505,),
+                )
+                mock_conn.commit.assert_called_once()
 

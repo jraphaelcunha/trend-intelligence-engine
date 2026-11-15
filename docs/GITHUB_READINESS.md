@@ -56,8 +56,9 @@ The scanner's default rules missed the Dockerfile secrets. The full-history scan
 No Docker build, deployment, live API, database migration, rotation or merge was run.
 No SQL bootstrap/schema/RPC definition is supplied; full end-to-end provisioning is
 not reproducible from this repository alone. SDK deprecation, embedding-dimension
-compatibility, Telegram access control and inherited TLS/n8n configuration remain
-explicitly documented limitations. HTTP timeouts remediated with tailored connect/read
+compatibility, and inherited TLS/n8n configuration remain explicitly documented limitations
+(Telegram Oráculo now enforces fail-closed `ALLOWED_TELEGRAM_USER_IDS` access control, and
+Monday exports enforce pre-create idempotency lookup by `analysis_id` with `MONDAY_BOARD_ID` parameterization). HTTP timeouts remediated with tailored connect/read
 limits across fetcher, exporters, and ops scripts (Bandit B113 resolved).
 
 Antigravity: browser inventory contained no available session/tab, so task submission

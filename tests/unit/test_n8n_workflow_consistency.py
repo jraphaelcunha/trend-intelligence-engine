@@ -121,3 +121,15 @@ def test_dockerfile_and_compose_mount_contracts():
     assert "COPY scripts /data/project/scripts" in dockerfile_content
     assert "../src:/data/project/src" in compose_content
     assert "../scripts:/data/project/scripts" in compose_content
+
+
+def test_monday_board_id_is_parameterized_not_hardcoded(workflow_data):
+    """Verify Create Monday Item node reads boardId via $env.MONDAY_BOARD_ID rather than static ID."""
+    create_item_nodes = [
+        n for n in workflow_data["nodes"]
+        if n.get("id") == "create-item-node-id"
+    ]
+    assert len(create_item_nodes) == 1
+    json_body = create_item_nodes[0].get("parameters", {}).get("jsonBody", "")
+    assert "$env.MONDAY_BOARD_ID" in json_body
+    assert '"boardId": "18413482266"' not in json_body
