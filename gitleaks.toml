@@ -1,0 +1,18 @@
+title = "Trend Intelligence - standard scanning plus project-specific runtime secret guards"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "trend-inline-n8n-encryption-key"
+description = "Hard-coded n8n encryption key in an environment assignment"
+regex = '''(?im)^[ \t]*(?:ENV[ \t]+|export[ \t]+)?N8N_ENCRYPTION_KEY[ \t]*=[ \t]*["']?([A-Za-z0-9+/_=-]{16,})'''
+secretGroup = 1
+keywords = ["N8N_ENCRYPTION_KEY"]
+
+[[rules]]
+id = "trend-inline-postgres-password"
+description = "Hard-coded n8n PostgreSQL password in an environment assignment"
+regex = '''(?im)^[ \t]*(?:ENV[ \t]+|export[ \t]+)?DB_POSTGRESDB_PASSWORD[ \t]*=[ \t]*["']?([^"'\s#$<{][^"'\s#]{7,})'''
+secretGroup = 1
+keywords = ["DB_POSTGRESDB_PASSWORD"]
